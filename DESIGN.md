@@ -30,7 +30,7 @@ This document provides a comprehensive design overview of the entire multicast e
 
 The multicast pipeline consists of three tiers:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        BSV Senders (Miners, Services)                       │
 │                              (UDP/TCP Ingress)                              │
@@ -117,7 +117,7 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Full Production Topology
 
-```
+```text
                     ┌─────────────────────────────────────────────────────────┐
                     │                    BSV Senders                          │
                     │            (Miners, Transaction Services)               │
@@ -151,8 +151,8 @@ The project is organized into multiple repositories, each with a specific respon
                                     ┌──────────────┐ ┌──────────────┐             │
                                     │ Consumer A   │ │ Consumer B   │             │
                                     └──────────────┘ └──────────────┘             │
-                                                                              │
-                                              NACK Retransmission ◄──────────┘
+                                                                                  │
+                                                   NACK Retransmission ◄──────────┘
                                               (re-multicast to FF05::<shard>)
 ```
 
@@ -162,10 +162,10 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Normal Flow (No Retransmission)
 
-```
+```text
 1. BSV Sender → bitcoin-shard-proxy
    ┌─────────────────────────────────────────────────────────────────────────┐
-   │ UDP/TCP: BRC-12/V2 frame (TxID, payload, optional SeqNum, SubtreeID)   │
+   │ UDP/TCP: BRC-12/V2 frame (TxID, payload, optional SeqNum, SubtreeID)    │
    └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -174,28 +174,28 @@ The project is organized into multiple repositories, each with a specific respon
    │ • Decode frame (extract TxID)                                           │
    │ • Stamp SenderID in-place (v2 only, bytes 88-103)                       │
    │ • Derive multicast group: FF05::<groupIndex> from TxID top bits         │
-   │ • Forward verbatim to all egress interfaces                              │
+   │ • Forward verbatim to all egress interfaces                             │
    └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 3. Multicast Fabric
    ┌─────────────────────────────────────────────────────────────────────────┐
    │ FF05::<groupIndex>:9001 delivered to all joined subscribers             │
-   │ (MLD snooping / PIM distribution tree)                                   │
+   │ (MLD snooping / PIM distribution tree)                                  │
    └─────────────────────────────────────────────────────────────────────────┘
                                     │
                     ┌───────────────┴───────────────┐
                     ▼                               ▼
 4a. Direct Subscriber              4b. bitcoin-shard-listener
-   ┌─────────────────────────────┐         ┌─────────────────────────────────────────┐
-   │ Miner / Exchange            │         │ • Join configured shard groups via MLD  │
+   ┌─────────────────────────────┐         ┌──────────────────────────────────────────┐
+   │ Miner / Exchange            │         │ • Join configured shard groups via MLD   │
    │ (consumes directly)         │         │ • Apply shard filter (defense-in-depth)  │
    └─────────────────────────────┘         │ • Apply subtree filter (include/exclude) │
-                                            │ • Track sequence gaps per (SenderID,    │
-                                            │   groupIndex)                           │
-                                            │ • Forward matching frames to egress_addr │
-                                            │   (UDP or TCP, optional strip-header)   │
-                                            └─────────────────────────────────────────┘
+                                           │ • Track sequence gaps per (SenderID,     │
+                                           │   groupIndex)                            │
+                                           │ • Forward matching frames to egress_addr │
+                                           │   (UDP or TCP, optional strip-header)    │
+                                           └──────────────────────────────────────────┘
                                                             │
                                                             ▼
                                                 5. Downstream Consumer
@@ -203,7 +203,7 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Retransmission Flow (NACK-based)
 
-```
+```text
 bitcoin-shard-listener detects gap:
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ • SeqNum arrives > highestConsec + 1                                    │
@@ -245,7 +245,7 @@ bitcoin-shard-listener receives repair
 
 The multicast group for a transaction is derived purely from its transaction ID:
 
-```
+```text
 groupIndex = (txid[0:4] as uint32 BE) >> (32 - shardBits)
 IPv6 group = [FFsc::groupIndex]
 ```
@@ -263,7 +263,7 @@ IPv6 group = [FFsc::groupIndex]
 
 Using top bits (right shift) instead of modulo provides consistent hashing:
 
-```
+```text
 shard_bits = 2  →  4 groups (0, 1, 2, 3)
 shard_bits = 3  →  8 groups (0a, 0b, 1a, 1b, 2a, 2b, 3a, 3b)
 
@@ -276,7 +276,7 @@ Group 1 splits into:  1a (txid[0] bit 31 = 0), 1b (txid[0] bit 31 = 1)
 
 ### IPv6 Multicast Address Layout
 
-```
+```text
 Bits [127:112]   FFsc   Multicast prefix + scope (e.g., FF05 for site-local)
 Bits [111:24]    0x00   Zero padding (assigned address space)
 Bits [23:0]      index  Group index (up to 24 bits = 16,777,216 groups)
@@ -299,7 +299,7 @@ Bits [23:0]      index  Group index (up to 24 bits = 16,777,216 groups)
 
 All multi-byte integers are big-endian. 8-byte alignment for all fields after offset 8.
 
-```
+```text
 Offset  Size  Align  Field            Value / Notes
 ------  ----  -----  -----            -------------
      0     4   —     Network magic    0xE3E1F3E8 (BSV mainnet P2P magic)
@@ -331,7 +331,7 @@ Offset  Size  Align  Field            Value / Notes
 
 Accepted and forwarded verbatim for backward compatibility.
 
-```
+```text
 Offset  Size  Field
 ------  ----  -----
      0     4  Network magic    0xE3E1F3E8
@@ -373,7 +373,7 @@ Offset  Size  Field
 - Stateless: no coordination between workers or nodes required
 
 **Architecture:**
-```
+```text
 UDP Workers (N goroutines, SO_REUSEPORT)
   ┌─────────┐
   │ Worker 0│──┐
@@ -427,7 +427,7 @@ TCP Listener (1 goroutine)
 - Egress via UDP or TCP (optional strip-header mode)
 
 **Architecture:**
-```
+```text
 Receive Workers (NUM_WORKERS goroutines, SO_REUSEPORT)
   ┌─────────┐
   │ Worker 0│──┐
@@ -507,7 +507,7 @@ Gap Tracker Sweeper (100ms interval)
 - Sharding-based multicast egress for retransmitted frames
 
 **Architecture:**
-```
+```text
 Multicast Receiver (1 worker, SO_REUSEPORT)
   ┌──────────────────┐
   │ Join all groups  │──▶ Cache (memory or Redis)
