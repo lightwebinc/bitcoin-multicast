@@ -125,11 +125,11 @@ The project is organized into multiple repositories, each with a specific respon
                                                 │  UDP/TCP (BRC-12/V2 frames)
                     ┌───────────────────────────┼─────────────────────────────┐
                     │                           │                             │
-              ┌─────▼─────┐             ┌─────▼─────┐               ┌─────▼─────┐
-              │ Ingress   │             │ Ingress   │               │ Ingress   │
-              │ Node A    │             │ Node B    │               │ Node C    │
-              │ (proxy)   │             │ (proxy)   │               │ (proxy)   │
-              └─────┬─────┘             └─────┬─────┘               └─────┬─────┘
+              ┌─────▼─────┐               ┌─────▼─────┐                 ┌─────▼─────┐
+              │ Ingress   │               │ Ingress   │                 │ Ingress   │
+              │ Node A    │               │ Node B    │                 │ Node C    │
+              │ (proxy)   │               │ (proxy)   │                 │ (proxy)   │
+              └─────┬─────┘               └─────┬─────┘                 └─────┬─────┘
                     │  IPv6 UDP Multicast (FF05::<shard>, port 9001)          │
                     └───────────────────────────┼─────────────────────────────┘
                                                 │
