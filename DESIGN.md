@@ -436,7 +436,7 @@ Receive Workers (NUM_WORKERS goroutines, SO_REUSEPORT)
   │ Worker 1│──│     • frame.Decode
   └─────────┘  │     • shard.Engine.GroupIndex
   ...          │     • filter.Allow
-  ┌─────────┘  │     • egress.Send
+  ┌─────────┐  │     • egress.Send
   │ Worker N│──│     • nack.Tracker.Observe
   └─────────┘  │
                │
