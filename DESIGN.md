@@ -215,7 +215,7 @@ bitcoin-shard-listener detects gap:
 NACK Dispatch (UDP to retry-endpoint:9300)
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ 64-byte NACK datagram: (TxID, ShardSeqNum, SubtreeID, SenderID)         │
-│ Sent to all configured retry endpoints                                  │
+│ Sent to all configured retry endpoints one after another                │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
