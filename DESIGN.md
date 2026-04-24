@@ -122,7 +122,7 @@ The project is organized into multiple repositories, each with a specific respon
                     │                    BSV Senders                          │
                     │            (Miners, Transaction Services)               │
                     └───────────────────────────┬─────────────────────────────┘
-                                                │  UDP/TCP (BRC-12/V2 frames)
+                                                │  UDP/TCP (BRC-12/BRC-123 frames)
                     ┌───────────────────────────┼─────────────────────────────┐
                     │                           │                             │
               ┌─────▼─────┐               ┌─────▼─────┐                 ┌─────▼─────┐
@@ -165,14 +165,14 @@ The project is organized into multiple repositories, each with a specific respon
 ```text
 1. BSV Sender → bitcoin-shard-proxy
    ┌─────────────────────────────────────────────────────────────────────────┐
-   │ UDP/TCP: BRC-12/V2 frame (TxID, payload, optional SeqNum, SubtreeID)    │
+   │ UDP/TCP: BRC-12/BRC-123 frame (TxID, payload, optional Sequence, Subtree) │
    └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 2. bitcoin-shard-proxy
    ┌─────────────────────────────────────────────────────────────────────────┐
    │ • Decode frame (extract TxID)                                           │
-   │ • Stamp SenderID in-place (v2 only, bytes 88-103)                       │
+   │ • Stamp Sender ID in-place (BRC-123 only, bytes 40-43)                    │
    │ • Derive multicast group: FF05::<groupIndex> from TxID top bits         │
    │ • Forward verbatim to all egress interfaces                             │
    └─────────────────────────────────────────────────────────────────────────┘
@@ -295,37 +295,39 @@ Bits [23:0]      index  Group index (up to 24 bits = 16,777,216 groups)
 
 ## Frame Format
 
-### v2 Frame Format (Current - 108 bytes)
+### BRC-123 Frame Format (Current - 92 bytes)
 
 All multi-byte integers are big-endian. 8-byte alignment for all fields after offset 8.
 
 ```text
-Offset  Size  Align  Field            Value / Notes
-------  ----  -----  -----            -------------
-     0     4   —     Network magic    0xE3E1F3E8 (BSV mainnet P2P magic)
-     4     2   —     Protocol ver     0x02BF = 703 (BSV node version baseline)
-     6     1   —     Frame version    0x02
-     7     1   —     Reserved         0x00
-     8    32   8B    Transaction ID   Raw 256-bit txid (internal byte order)
-    40     8   8B    Sequence ID      uint64 BE; random flow identifier; 0 = unset
-    48     8   8B    Seq num         uint64 BE; sender-assigned; 0 = unset
-    56    32   8B    Subtree ID       32-byte batch identifier; zeros = unset
-    88    16   8B    Sender ID        Original BSV sender IPv6 (net.IP.To16()); zeros = unset
-   104     4   8B    Payload length   uint32 BE; max 10 MiB
-   108     *   —     BSV tx payload   Raw serialised transaction bytes
+Offset  Size  Align  Field                 Value / Notes
+------  ----  -----  -----                 -------------
+     0     4   —     Network magic         0xE3E1F3E8 (BSV mainnet P2P magic)
+     4     2   —     Protocol ver          0x02BF = 703 (BSV node version baseline)
+     6     1   —     Frame version         0x02 (BRC-123)
+     7     1   —     Reserved              0x00
+     8    32   8B    Transaction ID        Raw 256-bit txid (internal byte order)
+    40     4   8B    Sender ID             CRC32c of source IPv6 address; 0 = unset
+    44     4   —     Sequence ID           Random temporal flow identifier; 0 = unset
+    48     4   8B    Shard Sequence Number Monotonic sender counter; 0 = unset
+    52     4   —     Reserved              Must be 0x00000000
+    56    32   8B    Subtree ID            32-byte batch identifier; zeros = unset
+    88     4   8B    Payload length        uint32 BE; max 10 MiB
+    92     *   —     BSV tx payload        Raw serialised transaction bytes
 ```
 
 **Field Details:**
 
 - **Network magic (0:4):** BSV mainnet P2P magic; enables standard firewall classification
 - **Protocol version (4:6):** Informational; 703 = BSV large-block policy baseline
-- **Frame version (6):** 0x02 for v2, 0x01 for v1 (legacy)
+- **Frame version (6):** 0x02 for BRC-123, 0x01 for legacy BRC-12
 - **Transaction ID (8:40):** Raw 256-bit txid in internal byte order (NOT display-reversed)
-- **Sequence ID (40:48):** Random flow identifier; reset periodically by sender; combined with SenderID and SeqNum for retransmission key
-- **Sequence number (48:56):** Monotonic counter per sender; enables gap detection
+- **Sender ID (40:44):** CRC32c checksum of source IPv6 address (Castagnoli polynomial 0x1EDC6F41). Enables per-sender gap tracking with minimal header overhead. Given BSV's mining economics, collision probability is ~0.01% at 1,000 senders, negligible at 100 senders.
+- **Sequence ID (44:48):** Random temporal flow identifier; reset periodically by sender; combined with Sender ID and Shard Sequence Number for retransmission key
+- **Shard Sequence Number (48:52):** Monotonic counter per sender; enables gap detection and NACK-based retransmission
+- **Reserved (52:56):** Padding for 8-byte alignment of Subtree ID; must be zero
 - **Subtree ID (56:88):** Opaque 32-byte batch identifier for subtree-level filtering
-- **Sender ID (88:104):** Stamped in-place by proxy from ingress source address; enables per-sender gap tracking. IPv4 sources appear as `::ffff:a.b.c.d` (IPv4-mapped)
-- **Payload (108+):** BSV transaction in P2P "tx" message format (version LE32 + inputs + outputs + locktime LE32)
+- **Payload (92+):** BSV transaction in BRC-12 raw format (version LE32 + inputs + outputs + locktime LE32)
 
 ### BRC-12 / v1 Frame Format (Legacy - 44 bytes)
 
@@ -343,19 +345,19 @@ Offset  Size  Field
     44     *  Payload
 ```
 
-**v1 Limitations:** No SequenceID, SeqNum, SubtreeID, or SenderID fields. Gap tracking and subtree filtering do not apply.
+**v1 Limitations:** No Sequence ID, Shard Sequence Number, Subtree ID, or Sender ID fields. Gap tracking and subtree filtering do not apply.
 
 ### Frame Processing Rules
 
 **Proxy (bitcoin-shard-proxy):**
-- Decode header (v1 or v2); drop on bad magic or unknown version
-- For v2: stamp SenderID in-place at bytes 88-103 from ingress source address
+- Decode header (v1 or BRC-123); drop on bad magic or unknown version
+- For BRC-123: stamp Sender ID in-place at bytes 40-43 from ingress source address CRC32c
 - Forward verbatim to all egress interfaces (no re-encoding)
 
 **Listener (bitcoin-shard-listener):**
 - Decode header; apply shard filter (group index)
 - Apply subtree filter (SubtreeID include/exclude)
-- For v2 with non-zero SenderID and SeqNum: track gaps per (SenderID, groupIndex)
+- For BRC-123 with non-zero Sender ID and Shard Sequence Number: track gaps per (Sender ID, groupIndex)
 - Forward matching frames to egress_addr (UDP or TCP)
 
 ---
@@ -394,7 +396,7 @@ TCP Listener (1 goroutine)
 
 **Hot Path:**
 1. `frame.Decode(raw)` → extract TxID
-2. Stamp SenderID in-place (v2 only): `raw[88:104] = sourceAddr.To16()`
+2. Stamp Sender ID in-place (BRC-123 only): `raw[40:44] = CRC32c(sourceAddr.To16())`
 3. `shard.Engine.GroupIndex(txid)` → derive group
 4. `WriteTo(raw)` → write to all egress interfaces
 
@@ -566,10 +568,10 @@ Retransmit Egress
 
 **Packages:**
 
-**frame:** v1/v2 wire format encoding/decoding
+**frame:** v1/BRC-123 wire format encoding/decoding
 - `Encode(f *Frame, buf []byte) (int, error)`: Serialize frame to buffer
 - `Decode(buf []byte) (*Frame, error)`: Parse buffer to frame (zero-copy)
-- Constants: `MagicBSV`, `ProtoVer`, `FrameVerV1`, `FrameVerV2`, `HeaderSizeV1`, `HeaderSize`, `MaxPayload`
+- Constants: `MagicBSV`, `ProtoVer`, `FrameVerLegacy`, `FrameVerBRC123`, `HeaderSizeLegacy`, `HeaderSize`, `MaxPayload`
 - Errors: `ErrBadMagic`, `ErrBadVer`, `ErrTooLarge`, `ErrTooShort`
 
 **shard:** Deterministic txid → IPv6 multicast group derivation
@@ -909,7 +911,7 @@ All services support graceful shutdown via SIGINT/SIGTERM:
 ### Source Documentation
 
 **Protocol:**
-- [Wire Protocol Specification](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md) - Complete v1/v2 frame format
+- [Wire Protocol Specification](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md) - Complete v1/BRC-123 frame format
 
 **Services:**
 - [bitcoin-shard-proxy Architecture](https://github.com/lightwebinc/bitcoin-shard-proxy/blob/main/docs/architecture.md)
@@ -979,7 +981,7 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 | Version | Header Size | Sequence Support | Subtree Support | SenderID |
 |---------|-------------|------------------|-----------------|----------|
 | v1      | 44 bytes    | No               | No              | No       |
-| v2      | 108 bytes   | Yes              | Yes             | Yes      |
+| BRC-123 | 92 bytes    | Yes              | Yes             | Yes      |
 ```
 
 ---
