@@ -79,57 +79,37 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Core Services (Binaries)
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────┐
-│ Repository                                                                      │ Purpose                                                                              │
-├─────────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────┤
-│ [bitcoin-shard-proxy](https://github.com/lightwebinc/bitcoin-shard-proxy)       │ Stateless ingress proxy; receives frames, derives multicast group, forwards verbatim │
-│ [bitcoin-shard-listener](https://github.com/lightwebinc/bitcoin-shard-listener) │ Multicast subscriber; filters by shard/subtree, forwards to unicast consumers        │
-│ [bitcoin-retry-endpoint](https://github.com/lightwebinc/bitcoin-retry-endpoint) │ Caches frames, retransmits on NACK requests                                          │
-└─────────────────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────┘
-```
+| Repository | Purpose |
+|---------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| [bitcoin-shard-proxy](https://github.com/lightwebinc/bitcoin-shard-proxy) | Stateless ingress proxy; receives frames, derives multicast group, forwards verbatim |
+| [bitcoin-shard-listener](https://github.com/lightwebinc/bitcoin-shard-listener) | Multicast subscriber; filters by shard/subtree, forwards to unicast consumers |
+| [bitcoin-retry-endpoint](https://github.com/lightwebinc/bitcoin-retry-endpoint) | Caches frames, retransmits on NACK requests |
 
 ### Shared Libraries
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────┬──────────────────────────────┐
-│ Repository                                                                  │ Purpose                                    │ Packages                     │
-├─────────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────┤
-│ [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) │ Protocol primitives shared across services │ `frame`, `shard`, `sequence` │
-└─────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────┴──────────────────────────────┘
-```
+| Repository | Purpose | Packages |
+|-----------------------------------------------------------------------------|--------------------------------------------|------------------------------|
+| [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) | Protocol primitives shared across services | `frame`, `shard`, `sequence` |
 
 ### Infrastructure Automation
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────┬────────────────────────┐
-│ Repository                                                                      │ Purpose                                         │ Deploys                │
-├─────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
-│ [bitcoin-ingress](https://github.com/lightwebinc/bitcoin-ingress)               │ Ansible/Terraform for ingress proxy deployment  │ bitcoin-shard-proxy    │
-│ [bitcoin-listener](https://github.com/lightwebinc/bitcoin-listener)             │ Ansible/Terraform for listener deployment       │ bitcoin-shard-listener │
-│ [bitcoin-retransmission](https://github.com/lightwebinc/bitcoin-retransmission) │ Ansible/Terraform for retry endpoint deployment │ bitcoin-retry-endpoint │
-└─────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────┴────────────────────────┘
-```
+| Repository | Purpose | Deploys |
+|---------------------------------------------------------------------------------|-------------------------------------------------|------------------------|
+| [bitcoin-ingress](https://github.com/lightwebinc/bitcoin-ingress) | Ansible/Terraform for ingress proxy deployment | bitcoin-shard-proxy |
+| [bitcoin-listener](https://github.com/lightwebinc/bitcoin-listener) | Ansible/Terraform for listener deployment | bitcoin-shard-listener |
+| [bitcoin-retransmission](https://github.com/lightwebinc/bitcoin-retransmission) | Ansible/Terraform for retry endpoint deployment | bitcoin-retry-endpoint |
 
 ### Testing and Tools
 
-```text
-┌───────────────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────┐
-│ Repository                                                                        │ Purpose                                       │
-├───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────┤
-│ [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) │ Traffic generator for load/functional testing │
-└───────────────────────────────────────────────────────────────────────────────────┴───────────────────────────────────────────────┘
-```
+| Repository | Purpose |
+|-----------------------------------------------------------------------------------|-----------------------------------------------|
+| [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) | Traffic generator for load/functional testing |
 
 ### Meta Repository
 
-```text
-┌───────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
-│ Repository                                                            │ Purpose                                                    │
-├───────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
-│ [bitcoin-multicast](https://github.com/lightwebinc/bitcoin-multicast) │ This repository; project overview and design documentation │
-└───────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
-```
+| Repository | Purpose |
+|-----------------------------------------------------------------------|------------------------------------------------------------|
+| [bitcoin-multicast](https://github.com/lightwebinc/bitcoin-multicast) | This repository; project overview and design documentation |
 
 ---
 
@@ -272,16 +252,12 @@ IPv6 group = [FFsc::groupIndex]
 
 **Example with shard_bits=2:**
 
-```text
-┌───────────────────┬───────────────────────┬─────────┬──────────────┬─────────────────────┐
-│ txid[0:4] (hex)   │ txid[0:4] (uint32)    │ >> 30   │ groupIndex   │ Multicast Address   │
-├───────────────────┼───────────────────────┼─────────┼──────────────┼─────────────────────┤
-│ 0x12345678        │ 305419896             │ 0       │ 0            │ FF05::0             │
-│ 0x87654321        │ 2271560481            │ 3       │ 3            │ FF05::3             │
-│ 0xABCD1234        │ 2882343444            │ 2       │ 2            │ FF05::2             │
-│ 0x4567ABCD        │ 1164413357            │ 1       │ 1            │ FF05::1             │
-└───────────────────┴───────────────────────┴─────────┴──────────────┴─────────────────────┘
-```
+| txid[0:4] (hex) | txid[0:4] (uint32) | >> 30 | groupIndex | Multicast Address |
+|-----------------|--------------------|-------|------------|-------------------|
+| 0x12345678 | 305419896 | 0 | 0 | FF05::0 |
+| 0x87654321 | 2271560481 | 3 | 3 | FF05::3 |
+| 0xABCD1234 | 2882343444 | 2 | 2 | FF05::2 |
+| 0x4567ABCD | 1164413357 | 1 | 1 | FF05::1 |
 
 ### Consistent Hashing Property
 
@@ -492,17 +468,13 @@ Gap Tracker Sweeper (100ms interval)
 
 **Filter Behavior:**
 
-```text
-┌─────────────────────────────┬────────────────────────────────────────┐
-│ Config                      │ Behavior                               │
-├─────────────────────────────┼────────────────────────────────────────┤
-│ `shard-include` empty       │ All shard indices accepted             │
-│ `shard-include` non-empty   │ Only listed indices accepted           │
-│ `subtree-include` empty     │ All SubtreeIDs accepted                │
-│ `subtree-include` non-empty │ Only listed IDs accepted               │
-│ `subtree-exclude`           │ Listed IDs dropped (overrides include) │
-└─────────────────────────────┴────────────────────────────────────────┘
-```
+| Config | Behavior |
+|-----------------------------|----------------------------------------|
+| `shard-include` empty | All shard indices accepted |
+| `shard-include` non-empty | Only listed indices accepted |
+| `subtree-include` empty | All SubtreeIDs accepted |
+| `subtree-include` non-empty | Only listed IDs accepted |
+| `subtree-exclude` | Listed IDs dropped (overrides include) |
 
 **Gap Tracking:**
 
@@ -843,15 +815,11 @@ make test-e2e
 
 ### Platform Support
 
-```text
-┌──────────────┬───────────────────┬────────────────────┬─────────┬────────────┬─────────┐
-│ OS           │ Service Manager   │ Network Config     │ Proxy   │ Listener   │ Retry   │
-├──────────────┼───────────────────┼────────────────────┼─────────┼────────────┼─────────┤
-│ Ubuntu 24.04 │ systemd           │ Netplan / ip       │ ✓       │ ✓          │ ✓       │
-│ FreeBSD 14   │ rc.d              │ rc.conf / ifconfig │ ✓       │ ✓          │ ✓       │
-│ AWS EC2      │ systemd           │ ENI + Terraform    │ ✓       │ ✓          │ ✓       │
-└──────────────┴───────────────────┴────────────────────┴─────────┴────────────┴─────────┘
-```
+| OS | Service Manager | Network Config | Proxy | Listener | Retry |
+|--------------|-----------------|--------------------|-------|----------|-------|
+| Ubuntu 24.04 | systemd | Netplan / ip | ✓ | ✓ | ✓ |
+| FreeBSD 14 | rc.d | rc.conf / ifconfig | ✓ | ✓ | ✓ |
+| AWS EC2 | systemd | ENI + Terraform | ✓ | ✓ | ✓ |
 
 ### Networking Requirements
 
