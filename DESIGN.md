@@ -79,37 +79,57 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Core Services (Binaries)
 
-| Repository | Purpose | Main Binary |
-|------------|---------|-------------|
-| [bitcoin-shard-proxy](https://github.com/lightwebinc/bitcoin-shard-proxy) | Stateless ingress proxy; receives frames, derives multicast group, forwards verbatim | `bitcoin-shard-proxy` |
-| [bitcoin-shard-listener](https://github.com/lightwebinc/bitcoin-shard-listener) | Multicast subscriber; filters by shard/subtree, forwards to unicast consumers | `bitcoin-shard-listener` |
-| [bitcoin-retry-endpoint](https://github.com/lightwebinc/bitcoin-retry-endpoint) | Caches frames, retransmits on NACK requests | `bitcoin-retry-endpoint` |
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────┐
+│ Repository                                                                      │ Purpose                                                                              │
+├─────────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────┤
+│ [bitcoin-shard-proxy](https://github.com/lightwebinc/bitcoin-shard-proxy)       │ Stateless ingress proxy; receives frames, derives multicast group, forwards verbatim │
+│ [bitcoin-shard-listener](https://github.com/lightwebinc/bitcoin-shard-listener) │ Multicast subscriber; filters by shard/subtree, forwards to unicast consumers        │
+│ [bitcoin-retry-endpoint](https://github.com/lightwebinc/bitcoin-retry-endpoint) │ Caches frames, retransmits on NACK requests                                          │
+└─────────────────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Shared Libraries
 
-| Repository | Purpose | Packages |
-|------------|---------|----------|
-| [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) | Protocol primitives shared across services | `frame`, `shard`, `sequence` |
+```text
+┌─────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────┬──────────────────────────────┐
+│ Repository                                                                  │ Purpose                                    │ Packages                     │
+├─────────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────┤
+│ [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) │ Protocol primitives shared across services │ `frame`, `shard`, `sequence` │
+└─────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────┴──────────────────────────────┘
+```
 
 ### Infrastructure Automation
 
-| Repository | Purpose | Deploys |
-|------------|---------|---------|
-| [bitcoin-ingress](https://github.com/lightwebinc/bitcoin-ingress) | Ansible/Terraform for ingress proxy deployment | bitcoin-shard-proxy |
-| [bitcoin-listener](https://github.com/lightwebinc/bitcoin-listener) | Ansible/Terraform for listener deployment | bitcoin-shard-listener |
-| [bitcoin-retransmission](https://github.com/lightwebinc/bitcoin-retransmission) | Ansible/Terraform for retry endpoint deployment | bitcoin-retry-endpoint |
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────┬────────────────────────┐
+│ Repository                                                                      │ Purpose                                         │ Deploys                │
+├─────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
+│ [bitcoin-ingress](https://github.com/lightwebinc/bitcoin-ingress)               │ Ansible/Terraform for ingress proxy deployment  │ bitcoin-shard-proxy    │
+│ [bitcoin-listener](https://github.com/lightwebinc/bitcoin-listener)             │ Ansible/Terraform for listener deployment       │ bitcoin-shard-listener │
+│ [bitcoin-retransmission](https://github.com/lightwebinc/bitcoin-retransmission) │ Ansible/Terraform for retry endpoint deployment │ bitcoin-retry-endpoint │
+└─────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────┴────────────────────────┘
+```
 
 ### Testing and Tools
 
-| Repository | Purpose |
-|------------|---------|
-| [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) | Traffic generator for load/functional testing |
+```text
+┌───────────────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────┐
+│ Repository                                                                        │ Purpose                                       │
+├───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) │ Traffic generator for load/functional testing │
+└───────────────────────────────────────────────────────────────────────────────────┴───────────────────────────────────────────────┘
+```
 
 ### Meta Repository
 
-| Repository | Purpose |
-|------------|---------|
-| [bitcoin-multicast](https://github.com/lightwebinc/bitcoin-multicast) | This repository; project overview and design documentation |
+```text
+┌───────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
+│ Repository                                                            │ Purpose                                                    │
+├───────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ [bitcoin-multicast](https://github.com/lightwebinc/bitcoin-multicast) │ This repository; project overview and design documentation │
+└───────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -165,14 +185,14 @@ The project is organized into multiple repositories, each with a specific respon
 ```text
 1. BSV Sender → bitcoin-shard-proxy
    ┌─────────────────────────────────────────────────────────────────────────┐
-   │ UDP/TCP: BRC-12/BRC-122 frame (TxID, payload, optional Sequence, Subtree) │
+   │ UDP/TCP: BRC-12/BRC-122 frame (TxID, payload, Sequence, Subtree)        │
    └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 2. bitcoin-shard-proxy
    ┌─────────────────────────────────────────────────────────────────────────┐
    │ • Decode frame (extract TxID)                                           │
-   │ • Stamp Sender ID in-place (BRC-122 only, bytes 40-43)                    │
+   │ • Stamp Sender ID in-place (BRC-122 only, bytes 40-43)                  │
    │ • Derive multicast group: FF05::<groupIndex> from TxID top bits         │
    │ • Forward verbatim to all egress interfaces                             │
    └─────────────────────────────────────────────────────────────────────────┘
@@ -214,7 +234,7 @@ bitcoin-shard-listener detects gap:
                                     ▼
 NACK Dispatch (UDP to retry-endpoint:9300)
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ 64-byte NACK datagram: (TxID, ShardSeqNum, SubtreeID, SenderID)         │
+│ 56-byte NACK datagram: (Magic, TxID, SenderID, SequenceID, SeqNum)      │
 │ Sent to all configured retry endpoints one after another                │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -252,12 +272,16 @@ IPv6 group = [FFsc::groupIndex]
 
 **Example with shard_bits=2:**
 
-| txid[0:4] (hex) | txid[0:4] (uint32)  | >> 30 | groupIndex | Multicast Address |
-|-----------------|---------------------|-------|------------|-------------------|
-| 0x12345678      | 305419896           | 0     | 0          | FF05::0           |
-| 0x87654321      | 2271560481          | 3     | 3          | FF05::3           |
-| 0xABCD1234      | 2882343444          | 2     | 2          | FF05::2           |
-| 0x4567ABCD      | 1164413357          | 1     | 1          | FF05::1           |
+```text
+┌───────────────────┬───────────────────────┬─────────┬──────────────┬─────────────────────┐
+│ txid[0:4] (hex)   │ txid[0:4] (uint32)    │ >> 30   │ groupIndex   │ Multicast Address   │
+├───────────────────┼───────────────────────┼─────────┼──────────────┼─────────────────────┤
+│ 0x12345678        │ 305419896             │ 0       │ 0            │ FF05::0             │
+│ 0x87654321        │ 2271560481            │ 3       │ 3            │ FF05::3             │
+│ 0xABCD1234        │ 2882343444            │ 2       │ 2            │ FF05::2             │
+│ 0x4567ABCD        │ 1164413357            │ 1       │ 1            │ FF05::1             │
+└───────────────────┴───────────────────────┴─────────┴──────────────┴─────────────────────┘
+```
 
 ### Consistent Hashing Property
 
@@ -350,11 +374,13 @@ Offset  Size  Field
 ### Frame Processing Rules
 
 **Proxy (bitcoin-shard-proxy):**
+
 - Decode header (v1 or BRC-122); drop on bad magic or unknown version
 - For BRC-122: stamp Sender ID in-place at bytes 40-43 from ingress source address CRC32c
 - Forward verbatim to all egress interfaces (no re-encoding)
 
 **Listener (bitcoin-shard-listener):**
+
 - Decode header; apply shard filter (group index)
 - Apply subtree filter (SubtreeID include/exclude)
 - For BRC-122 with non-zero Sender ID and Shard Sequence Number: track gaps per (Sender ID, groupIndex)
@@ -369,12 +395,14 @@ Offset  Size  Field
 **Purpose:** Stateless ingress proxy; receives BSV transaction frames, derives multicast group, forwards verbatim.
 
 **Key Characteristics:**
+
 - Zero-copy forwarding: frame never modified after SenderID stamp
 - Multi-CPU design: N UDP workers via SO_REUSEPORT + 1 TCP listener
 - Deterministic: same txid always maps to same group
 - Stateless: no coordination between workers or nodes required
 
 **Architecture:**
+
 ```text
 UDP Workers (N goroutines, SO_REUSEPORT)
   ┌─────────┐
@@ -395,12 +423,14 @@ TCP Listener (1 goroutine)
 ```
 
 **Hot Path:**
+
 1. `frame.Decode(raw)` → extract TxID
 2. Stamp Sender ID in-place (BRC-122 only): `raw[40:44] = CRC32c(sourceAddr.To16())`
 3. `shard.Engine.GroupIndex(txid)` → derive group
 4. `WriteTo(raw)` → write to all egress interfaces
 
 **Configuration:**
+
 - `-iface`: Egress interface(s) (comma-separated)
 - `-shard-bits`: Txid prefix bit width (1-24, default 16)
 - `-scope`: Multicast scope (link|site|org|global, default site)
@@ -408,7 +438,8 @@ TCP Listener (1 goroutine)
 - `-tcp-listen-port`: TCP ingress port (0 = disabled)
 - `-egress-port`: Multicast egress port (default 9001)
 
-**Metrics (bsp_ prefix):**
+**Metrics (bsp\_ prefix):**
+
 - `bsp_packets_received_total`, `bsp_packets_forwarded_total`, `bsp_packets_dropped_total`
 - `bsp_bytes_received_total`, `bsp_bytes_forwarded_total`
 - `bsp_tcp_connections_total`, `bsp_tcp_errors_total`
@@ -422,6 +453,7 @@ TCP Listener (1 goroutine)
 **Purpose:** Multicast subscriber; filters by shard/subtree, forwards to unicast consumers, performs NACK-based gap recovery.
 
 **Key Characteristics:**
+
 - SO_REUSEPORT multi-worker receive (kernel-level source affinity)
 - Dual-level filtering: MLD group join + userspace shard/subtree filter
 - NORM-inspired gap tracking per (SenderID, groupIndex)
@@ -429,6 +461,7 @@ TCP Listener (1 goroutine)
 - Egress via UDP or TCP (optional strip-header mode)
 
 **Architecture:**
+
 ```text
 Receive Workers (NUM_WORKERS goroutines, SO_REUSEPORT)
   ┌─────────┐
@@ -458,15 +491,21 @@ Gap Tracker Sweeper (100ms interval)
 **Important:** Linux delivers multicast to ALL SO_REUSEPORT sockets (no load balancing). For multicast deployments, `NUM_WORKERS` must be set to 1. Multiple workers are only useful for unicast ingress (E2E test suite).
 
 **Filter Behavior:**
-| Config | Behavior |
-|--------|----------|
-| `shard-include` empty | All shard indices accepted |
-| `shard-include` non-empty | Only listed indices accepted |
-| `subtree-include` empty | All SubtreeIDs accepted |
-| `subtree-include` non-empty | Only listed IDs accepted |
-| `subtree-exclude` | Listed IDs dropped (overrides include) |
+
+```text
+┌─────────────────────────────┬────────────────────────────────────────┐
+│ Config                      │ Behavior                               │
+├─────────────────────────────┼────────────────────────────────────────┤
+│ `shard-include` empty       │ All shard indices accepted             │
+│ `shard-include` non-empty   │ Only listed indices accepted           │
+│ `subtree-include` empty     │ All SubtreeIDs accepted                │
+│ `subtree-include` non-empty │ Only listed IDs accepted               │
+│ `subtree-exclude`           │ Listed IDs dropped (overrides include) │
+└─────────────────────────────┴────────────────────────────────────────┘
+```
 
 **Gap Tracking:**
+
 - State key: `(SenderID, groupIndex)`
 - Per-key state: `highestConsec`, `pending` map
 - When seq > highestConsec+1: register missing seqs in pending
@@ -475,6 +514,7 @@ Gap Tracker Sweeper (100ms interval)
 - NACK dispatch with exponential backoff (capped at `nack-backoff-max`)
 
 **Configuration:**
+
 - `-iface`: Ingress interface for multicast receive
 - `-listen-port`: Multicast listen port (default 9001)
 - `-shard-bits`: Txid prefix bit width (1-24, default 16)
@@ -485,10 +525,11 @@ Gap Tracker Sweeper (100ms interval)
 - `-egress-proto`: udp or tcp (default udp)
 - `-strip-header`: Send payload only (default false)
 - `-retry-endpoints`: Comma-separated retry endpoint addresses
-- `-nack-gap-ttl`: Gap detection TTL (default 100ms)
+- `-nack-gap-ttl`: Maximum time to attempt gap recovery before evicting (default 10m)
 - `-nack-max-retries`: Maximum NACK retries per gap (default 3)
 
-**Metrics (bsl_ prefix):**
+**Metrics (bsl\_ prefix):**
+
 - `bsl_frames_received_total`, `bsl_frames_forwarded_total`, `bsl_frames_dropped_total`
 - `bsl_gaps_detected_total`, `bsl_gaps_suppressed_total`, `bsl_gaps_unrecovered_total`
 - `bsl_nacks_sent_total`, `bsl_nacks_unrecovered_total`
@@ -502,6 +543,7 @@ Gap Tracker Sweeper (100ms interval)
 **Purpose:** Caches frames, retransmits on NACK requests from listeners.
 
 **Key Characteristics:**
+
 - Single-worker multicast receiver (SO_REUSEPORT limitation)
 - Modular cache backend: Redis (primary) or in-memory (fallback)
 - Three-level rate limiting: IP, SenderID, SequenceID
@@ -509,6 +551,7 @@ Gap Tracker Sweeper (100ms interval)
 - Sharding-based multicast egress for retransmitted frames
 
 **Architecture:**
+
 ```text
 Multicast Receiver (1 worker, SO_REUSEPORT)
   ┌──────────────────┐
@@ -527,19 +570,23 @@ Retransmit Egress
 ```
 
 **Cache Backends:**
+
 - **memory:** In-memory cache; single-node deployments
 - **redis:** External Redis cluster; multi-node deployments, shared cache
 
 **Rate Limiting:**
+
 - IP level: Token bucket (rate + burst)
 - SenderID level: Sliding window per sender
 - SequenceID level: Max requests per sequence
 
 **Deduplication:**
-- Key: SenderID (16B) + SequenceID (8B) + ShardSeqNum (8B) = 32B
+
+- Key: SenderID (4B) + SequenceID (4B) + SeqNum (4B) = 12B
 - Redis SET NX with 60s TTL prevents multiple endpoints from retransmitting the same frame
 
 **Configuration:**
+
 - `-mc-iface`: Multicast ingress interface
 - `-listen-port`: Multicast listen port (default 9001)
 - `-shard-bits`: Txid prefix bit width (1-24, default 16)
@@ -552,7 +599,8 @@ Retransmit Egress
 - `-egress-port`: Retransmission port (default 9100)
 - `-dedup-window`: Deduplication window (default 60s)
 
-**Metrics (bre_ prefix):**
+**Metrics (bre\_ prefix):**
+
 - `bre_cache_hits_total`, `bre_cache_misses_total`, `bre_cache_size`
 - `bre_nack_requests_total`, `bre_retransmits_total`, `bre_retransmit_dedup_total`
 - `bre_rate_limit_drops_total{level=ip|sender|sequence}`
@@ -569,18 +617,21 @@ Retransmit Egress
 **Packages:**
 
 **frame:** v1/BRC-122 wire format encoding/decoding
+
 - `Encode(f *Frame, buf []byte) (int, error)`: Serialize frame to buffer
 - `Decode(buf []byte) (*Frame, error)`: Parse buffer to frame (zero-copy)
 - Constants: `MagicBSV`, `ProtoVer`, `FrameVerLegacy`, `FrameVerBRC122`, `HeaderSizeLegacy`, `HeaderSize`, `MaxPayload`
 - Errors: `ErrBadMagic`, `ErrBadVer`, `ErrTooLarge`, `ErrTooShort`
 
 **shard:** Deterministic txid → IPv6 multicast group derivation
+
 - `Engine`: Immutable sharding parameters (mcPrefix, middleBytes, shardBits)
 - `GroupIndex(txid *[32]byte) uint32`: Extract group index from txid
 - `Addr(groupIndex uint32, port int) *net.UDPAddr`: Construct multicast address
 - Consistent hashing: increasing shardBits splits groups without invalidating existing subscriptions
 
 **sequence:** Per-shard monotonic sequence counters
+
 - Per-shard atomic.Uint64 counters
 - Zero allocation, no contention between shards
 - Used for proxy-side sequence numbering (currently unused in main binary)
@@ -595,16 +646,24 @@ Retransmit Egress
 
 Listeners detect sequence gaps and send NACK datagrams to retry endpoints:
 
-**NACK Format (64 bytes):**
+**NACK Format (56 bytes):**
+
 ```
 Offset  Size  Field
 ------  ----  -----
-     0    32  Transaction ID
-    32     8  ShardSeqNum
-    40    32  SubtreeID
+     0     4  Magic (0xE3E1F3E8)
+     4     2  Protocol version (0x02BF)
+     6     1  Message type (0x10 = NACK, 0x11 = MISS)
+     7     1  Reserved
+     8    32  Transaction ID
+    40     4  Sender ID
+    44     4  Sequence ID
+    48     4  Shard Sequence Number
+    52     4  Reserved (padding)
 ```
 
 **NACK Dispatch Flow:**
+
 ```
 1. Gap detected (seq > highestConsec + 1)
    → Register in pending map with detected timestamp
@@ -619,7 +678,8 @@ Offset  Size  Field
 ```
 
 **Exponential Backoff:**
-- Initial delay: `nack-gap-ttl` (default 100ms)
+
+- Initial delay: `nack-gap-ttl` (default 10m)
 - Backoff multiplier: 2x
 - Maximum backoff: `nack-backoff-max` (default 5s)
 
@@ -629,9 +689,9 @@ Offset  Size  Field
 1. Receive NACK on port 9300
 2. Rate limit check (IP, SenderID, SequenceID)
    → If exceeded: silent drop, increment bre_rate_limit_drops_total
-3. Cache lookup (TxID, ShardSeqNum, SubtreeID)
+3. Cache lookup (TxID, SeqNum)
    → If found in cache:
-     • Check dedup key (SenderID + SequenceID + ShardSeqNum)
+     • Check dedup key (SenderID + SequenceID + SeqNum)
      • If not recently retransmitted (Redis SET NX):
        → Re-multicast to FF05::<shard>:9100
        → Increment bre_retransmits_total
@@ -643,16 +703,19 @@ Offset  Size  Field
 ### Reliability Characteristics
 
 **Best-effort delivery:**
+
 - Multicast is inherently unreliable (no ACKs)
 - NACK provides selective retransmission for detected gaps
 - No guarantee of recovery (network partition, cache expiration)
 
 **Cache TTL considerations:**
+
 - Default cache TTL: 10 minutes
 - Trade-off: Longer TTL = higher recovery probability, but more memory
 - Adjust based on expected gap detection latency and network conditions
 
 **Silent drops:**
+
 - Bad frames (magic, version, payload size) are silently dropped
 - Rate-limited NACKs are silently dropped
 - Missing cache entries result in silent NACK drops
@@ -664,9 +727,10 @@ Offset  Size  Field
 
 ### Subtree Model
 
-A *subtree* is an ordered set of related transactions sharing a common batch context. The 32-byte `SubtreeID` field allows downstream subscribers to associate frames with a named batch.
+A _subtree_ is an ordered set of related transactions sharing a common batch context. The 32-byte `SubtreeID` field allows downstream subscribers to associate frames with a named batch.
 
 **Use Cases:**
+
 - Shard by transaction type (payments, contracts, tokens)
 - Shard by application or service
 - Shard by geographic region
@@ -675,23 +739,27 @@ A *subtree* is an ordered set of related transactions sharing a common batch con
 ### Subtree Filter Behavior
 
 **Include Mode:**
+
 ```
 subtree-include = "abc123...,def456..."  (hex, 32-byte each)
 → Only frames with SubtreeID in this set pass
 ```
 
 **Exclude Mode:**
+
 ```
 subtree-exclude = "abc123...,def456..."  (hex, 32-byte each)
 → Frames with SubtreeID in this set are dropped (overrides include)
 ```
 
 **Empty Sets:**
+
 - `subtree-include` empty: all SubtreeIDs accepted
 - `subtree-exclude` empty: no exclusion
 - Both empty: no subtree filtering (all frames pass)
 
 **V1 Frames:**
+
 - V1 frames have zero SubtreeID
 - Only pass subtree filter if zero is explicitly listed in `subtree-include`
 
@@ -714,6 +782,7 @@ With N=8 subtrees and a fixed seed, the same txid always maps to the same subtre
 **Purpose:** Random BSV-shaped frame generator for load and functional testing.
 
 **Features:**
+
 - Random BSV-shaped tx payloads (version/vin/vout/locktime)
 - Subtree ID pool (N deterministic 32-byte IDs from seed)
 - Sequence numbers with optional gap injection (permanent or delayed retransmission)
@@ -754,11 +823,13 @@ subtx-gen -subtrees 8 -subtree-seed 'test-seed' -print-subtrees
 **Approach:** Inject frames as unicast UDP directly to listener's bound port (`[::1]:listen-port`), bypassing proxy and multicast fabric. This avoids Linux loopback multicast reliability issues on CI.
 
 **Test Scenarios:**
+
 1. Basic delivery (all frames, metric verification)
 2. Shard filter (single shard acceptance)
 3. Strip-header (payload-only forwarding)
 
 **Execution:**
+
 ```bash
 cd bitcoin-shard-listener
 make test-e2e
@@ -772,38 +843,47 @@ make test-e2e
 
 ### Platform Support
 
-| OS | Service Manager | Network Config | Proxy | Listener | Retry |
-|----|-----------------|----------------|-------|----------|-------|
-| Ubuntu 24.04 | systemd | Netplan / ip | ✓ | ✓ | ✓ |
-| FreeBSD 14 | rc.d | rc.conf / ifconfig | ✓ | ✓ | ✓ |
-| AWS EC2 | systemd | ENI + Terraform | ✓ | ✓ | ✓ |
+```text
+┌──────────────┬───────────────────┬────────────────────┬─────────┬────────────┬─────────┐
+│ OS           │ Service Manager   │ Network Config     │ Proxy   │ Listener   │ Retry   │
+├──────────────┼───────────────────┼────────────────────┼─────────┼────────────┼─────────┤
+│ Ubuntu 24.04 │ systemd           │ Netplan / ip       │ ✓       │ ✓          │ ✓       │
+│ FreeBSD 14   │ rc.d              │ rc.conf / ifconfig │ ✓       │ ✓          │ ✓       │
+│ AWS EC2      │ systemd           │ ENI + Terraform    │ ✓       │ ✓          │ ✓       │
+└──────────────┴───────────────────┴────────────────────┴─────────┴────────────┴─────────┘
+```
 
 ### Networking Requirements
 
 **Ingress (bitcoin-shard-proxy):**
+
 - IPv6 enabled on egress interface(s)
 - Multicast routing / MLD snooping configured for subscriber fabric
 - Optional: GRE tunnel for cloud VMs
 - Optional: eBGP for nearest-node routing
 
 **Listener (bitcoin-shard-listener):**
+
 - IPv6 enabled on ingress interface
 - MLDv1/v2 support for multicast group join
 - Optional: BGP for listener reachability into fabric
 - Firewall: multicast-fabric perimeter (default-on in bitcoin-listener)
 
 **Retry Endpoint (bitcoin-retry-endpoint):**
+
 - IPv6 enabled on multicast interface
 - Optional: Redis for shared cache (multi-node deployments)
 
 ### Firewall Configuration
 
 **Proxy (bitcoin-ingress):**
+
 - Allow UDP/TCP ingress on listen port (default 9000)
 - Allow IPv6 multicast egress on egress interface
 - No additional firewall rules required
 
 **Listener (bitcoin-listener):**
+
 - **Multicast-fabric perimeter:** Built-in firewall enforces:
   - Ingress: Only multicast data on ingress interface
   - Egress: Only NACK datagrams outbound
@@ -811,6 +891,7 @@ make test-e2e
 - See [bitcoin-listener security docs](https://github.com/lightwebinc/bitcoin-listener/blob/main/docs/security.md)
 
 **Retry Endpoint (bitcoin-retransmission):**
+
 - Simplified UDP-only firewall
 - Allow NACK ingress on port 9300
 - Allow multicast egress on egress interface
@@ -818,33 +899,39 @@ make test-e2e
 ### BGP Integration
 
 **Ingress (bitcoin-ingress):**
+
 - Optional eBGP on ingress interface
 - Announce shared prefixes from all proxy nodes
 - Senders routed to nearest proxy via BGP best-path selection
 - See [bitcoin-ingress BGP docs](https://github.com/lightwebinc/bitcoin-ingress/blob/main/docs/bgp.md)
 
 **Listener (bitcoin-listener):**
+
 - Optional BGP for listener reachability into fabric
 - Advertise listener's own unicast prefix
 - Enables MLD/PIM distribution trees in L3 fabrics
 - See [bitcoin-listener BGP docs](https://github.com/lightwebinc/bitcoin-listener/blob/main/docs/bgp.md)
 
 **Retry Endpoint (bitcoin-retransmission):**
+
 - No BGP integration (pure cache-and-retransmit service)
 
 ### Scaling Guidelines
 
 **Ingress Scaling:**
+
 - Add more proxy nodes (stateless, no coordination)
 - Increase `shard_bits` to split multicast groups
 - Use eBGP for load distribution across nodes
 
 **Listener Scaling:**
+
 - Deploy multiple listeners with different `shard-include` configurations
 - Use subtree filtering for application-level sharding
 - Horizontal scale: add more listeners per shard/subtree
 
 **Retry Endpoint Scaling:**
+
 - Deploy multiple retry endpoints with shared Redis cache
 - Cross-instance deduplication prevents duplicate retransmissions
 - Rate limiting protects against NACK storms
@@ -864,17 +951,20 @@ All services expose Prometheus metrics on dedicated ports:
 **Key Metrics to Monitor:**
 
 **Proxy:**
+
 - `bsp_packets_dropped_total{reason}`: Packet loss reasons
 - `bsp_bytes_forwarded_total`: Throughput
 - `bsp_tcp_errors_total`: TCP ingress errors
 
 **Listener:**
+
 - `bsl_frames_dropped_total{reason}`: Drop reasons (shard_filter, subtree_exclude, etc.)
 - `bsl_gaps_detected_total`: Gap detection rate
 - `bsl_gaps_suppressed_total`: Successful gap recovery
 - `bsl_nacks_unrecovered_total`: Unrecoverable gaps
 
 **Retry Endpoint:**
+
 - `bre_cache_misses_total`: Cache effectiveness
 - `bre_retransmit_dedup_total`: Duplicate suppression
 - `bre_rate_limit_drops_total{level}`: Rate limit violations
@@ -884,6 +974,7 @@ All services expose Prometheus metrics on dedicated ports:
 All services support graceful shutdown via SIGINT/SIGTERM:
 
 **Proxy:**
+
 1. Drain: Set draining flag, `/readyz` returns 503
 2. Optional drain timeout (configurable)
 3. Close ingress sockets
@@ -891,6 +982,7 @@ All services support graceful shutdown via SIGINT/SIGTERM:
 5. Flush OTLP exporter
 
 **Listener:**
+
 1. Drain: Set draining flag, `/readyz` returns 503
 2. Optional drain timeout (configurable)
 3. Close ingress sockets
@@ -898,6 +990,7 @@ All services support graceful shutdown via SIGINT/SIGTERM:
 5. Flush OTLP exporter
 
 **Retry Endpoint:**
+
 1. Drain: Set draining flag, `/readyz` returns 503
 2. Optional drain timeout (configurable)
 3. Close ingress sockets
@@ -911,14 +1004,17 @@ All services support graceful shutdown via SIGINT/SIGTERM:
 ### Source Documentation
 
 **Protocol:**
+
 - [Wire Protocol Specification](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md) - Complete v1/BRC-122 frame format
 
 **Services:**
+
 - [bitcoin-shard-proxy Architecture](https://github.com/lightwebinc/bitcoin-shard-proxy/blob/main/docs/architecture.md)
 - [bitcoin-shard-listener Architecture](https://github.com/lightwebinc/bitcoin-shard-listener/blob/main/docs/architecture.md)
 - [bitcoin-retry-endpoint README](https://github.com/lightwebinc/bitcoin-retry-endpoint)
 
 **Infrastructure:**
+
 - [bitcoin-ingress Architecture](https://github.com/lightwebinc/bitcoin-ingress/blob/main/docs/architecture.md)
 - [bitcoin-listener Architecture](https://github.com/lightwebinc/bitcoin-listener/blob/main/docs/architecture.md)
 - [bitcoin-retransmission Architecture](https://github.com/lightwebinc/bitcoin-retransmission/blob/main/docs/architecture.md)
@@ -934,6 +1030,7 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 ### Standards
 
 **BRC-12: Raw Transaction Format**
+
 - The v1 wire-frame format transports transactions conforming to BRC-12
 - [BSV Blockchain Standards Repository](https://github.com/bitcoin-sv/BRCs/blob/master/transactions/0012.md)
 
@@ -947,7 +1044,7 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 | Service                            | Port | Protocol | Purpose                |
 |------------------------------------|------|----------|------------------------|
 | bitcoin-shard-proxy (UDP ingress)  | 9000 | UDP      | Frame ingress          |
-| bitcoin-shard-proxy (TCP ingress)  | 9100 | TCP      | Reliable frame ingress |
+| bitcoin-shard-proxy (TCP ingress)  | configurable | TCP      | Reliable frame ingress (disabled by default) |
 | bitcoin-shard-proxy (egress)       | 9001 | UDP      | Multicast egress       |
 | bitcoin-shard-listener (multicast) | 9001 | UDP      | Multicast receive      |
 | bitcoin-shard-listener (NACK)      | 9300 | UDP      | NACK send              |
@@ -986,5 +1083,5 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 
 ---
 
-*Document Version: 1.0*  
-*Last Updated: 2026-04-22*
+_Document Version: 1.0_  
+_Last Updated: 2026-04-22_
