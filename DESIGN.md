@@ -23,6 +23,8 @@ This document provides a comprehensive design overview of the entire multicast e
 9. [Subtree Filtering](#subtree-filtering)
 10. [Testing and Validation](#testing-and-validation)
 11. [Deployment Considerations](#deployment-considerations)
+12. [Endpoint Discovery (BRC-125/126)](#endpoint-discovery-brc-125126)
+13. [NACK Retransmission Flow](#nack-retransmission-flow)
 
 ---
 
@@ -293,74 +295,26 @@ Bits [23:0]      index  Group index (up to 24 bits = 16,777,216 groups)
 | global       | E    | FF0E::   | Internet-wide            |
 ```
 
+**Control-Plane Reserved Indices (BRC-126):**
+
+```text
+| Index      | Purpose          | Scope | Compressed Address |
+|------------|------------------|-------|--------------------|
+| 0xFFFFFD   | Beacon (site)    | FF05  | FF05::FF:FFFD      |
+| 0xFFFFFD   | Beacon (global)  | FF0E  | FF0E::FF:FFFD      |
+| 0xFFFFFE   | Control channel  | FF0E  | FF0E::FF:FFFE      |
+| 0xFFFFFF   | (reserved)       | —     | do not use         |
+```
+
+See [BRC-126 Multicast Group Address Assignments](docs/brc-126-multicast-addressing.md) for full details.
+
 ## Frame Format
 
-### BRC-124 Frame Format (Current - 92 bytes)
+The BRC-124 data-plane frame format (92-byte header, replacing the legacy 44-byte BRC-12 header) is defined in a dedicated design document:
 
-All multi-byte integers are big-endian. 8-byte alignment for all fields after offset 8.
+**→ [BRC-124 Frame Format](docs/brc-124-frame-format.md)**
 
-```text
-Offset  Size  Align  Field                 Value / Notes
-------  ----  -----  -----                 -------------
-     0     4   —     Network magic         0xE3E1F3E8 (BSV mainnet P2P magic)
-     4     2   —     Protocol ver          0x02BF = 703 (BSV node version baseline)
-     6     1   —     Frame version         0x02 (BRC-124)
-     7     1   —     Reserved              0x00
-     8    32   8B    Transaction ID        Raw 256-bit txid (internal byte order)
-    40     4   8B    Sender ID             CRC32c of source IPv6 address; 0 = unset
-    44     4   —     Sequence ID           Random temporal flow identifier; 0 = unset
-    48     4   8B    Shard Sequence Number Monotonic sender counter; 0 = unset
-    52     4   —     Reserved              Must be 0x00000000
-    56    32   8B    Subtree ID            32-byte batch identifier; zeros = unset
-    88     4   8B    Payload length        uint32 BE; max 10 MiB
-    92     *   —     BSV tx payload        Raw serialised transaction bytes
-```
-
-**Field Details:**
-
-- **Network magic (0:4):** BSV mainnet P2P magic; enables standard firewall classification
-- **Protocol version (4:6):** Informational; 703 = BSV large-block policy baseline
-- **Frame version (6):** 0x02 for BRC-124, 0x01 for legacy BRC-12
-- **Transaction ID (8:40):** Raw 256-bit txid in internal byte order (NOT display-reversed)
-- **Sender ID (40:44):** CRC32c checksum of source IPv6 address (Castagnoli polynomial 0x1EDC6F41). Enables per-sender gap tracking with minimal header overhead. Given BSV's mining economics, collision probability is ~0.01% at 1,000 senders, negligible at 100 senders.
-- **Sequence ID (44:48):** Random temporal flow identifier; reset periodically by sender; combined with Sender ID and Shard Sequence Number for retransmission key
-- **Shard Sequence Number (48:52):** Monotonic counter per sender; enables gap detection and NACK-based retransmission
-- **Reserved (52:56):** Padding for 8-byte alignment of Subtree ID; must be zero
-- **Subtree ID (56:88):** Opaque 32-byte batch identifier for subtree-level filtering
-- **Payload (92+):** BSV transaction in BRC-12 raw format (version LE32 + inputs + outputs + locktime LE32)
-
-### BRC-12 / v1 Frame Format (Legacy - 44 bytes)
-
-Accepted and forwarded verbatim for backward compatibility.
-
-```text
-Offset  Size  Field
-------  ----  -----
-     0     4  Network magic    0xE3E1F3E8
-     4     2  Protocol ver     0x02BF
-     6     1  Frame version    0x01
-     7     1  Reserved         0x00
-     8    32  Transaction ID
-    40     4  Payload length
-    44     *  Payload
-```
-
-**v1 Limitations:** No Sequence ID, Shard Sequence Number, Subtree ID, or Sender ID fields. Gap tracking and subtree filtering do not apply.
-
-### Frame Processing Rules
-
-**Proxy (bitcoin-shard-proxy):**
-
-- Decode header (v1 or BRC-124); drop on bad magic or unknown version
-- For BRC-124: stamp Sender ID in-place at bytes 40-43 from ingress source address CRC32c
-- Forward verbatim to all egress interfaces (no re-encoding)
-
-**Listener (bitcoin-shard-listener):**
-
-- Decode header; apply shard filter (group index)
-- Apply subtree filter (SubtreeID include/exclude)
-- For BRC-124 with non-zero Sender ID and Shard Sequence Number: track gaps per (Sender ID, groupIndex)
-- Forward matching frames to egress_addr (UDP or TCP)
+Key fields: Network magic, Protocol version, Frame version, Transaction ID, Sender ID (CRC32c), Sequence ID, Shard Sequence Number, Subtree ID, Payload length, and BSV tx payload. Both v1 (legacy) and BRC-124 frames are accepted by all components.
 
 ---
 
@@ -614,71 +568,76 @@ Retransmit Egress
 
 ## Retransmission and Reliability
 
-### NACK Protocol
+### NACK Protocol (BRC-125)
 
-Listeners detect sequence gaps and send NACK datagrams to retry endpoints:
+Listeners detect sequence gaps and send 56-byte NACK datagrams to retry endpoints. The full wire format, response protocol, and escalation state machine are defined in:
 
-**NACK Format (56 bytes):**
+**→ [BRC-125 Retransmission Protocol](docs/brc-125-retransmission-protocol.md)**
 
-```
-Offset  Size  Field
-------  ----  -----
-     0     4  Magic (0xE3E1F3E8)
-     4     2  Protocol version (0x02BF)
-     6     1  Message type (0x10 = NACK, 0x11 = MISS)
-     7     1  Reserved
-     8    32  Transaction ID
-    40     4  Sender ID
-    44     4  Sequence ID
-    48     4  Shard Sequence Number
-    52     4  Reserved (padding)
-```
+**Key changes from the original fire-and-forget NACK model:**
 
-**NACK Dispatch Flow:**
+- **ACK/MISS responses** — every NACK receives a unicast response (24 bytes). ACK confirms retransmit dispatched; MISS indicates cache miss and triggers immediate escalation to the next endpoint.
+- **Beacon discovery** — retry endpoints periodically multicast ADVERT messages (56 bytes) to site/global beacon groups. Listeners maintain a dynamic endpoint registry, sorted by `(Tier ASC, Preference DESC)`.
+- **Tier-based escalation** — on MISS, listeners advance through endpoints at the same tier, then escalate to the next tier. No backoff on MISS; immediate retry.
+- **Configurable retransmit modes** — endpoints can retransmit via multicast, unicast, or both. Responses can be selectively suppressed.
 
-```
+### NACK Dispatch Flow
+
+```text
 1. Gap detected (seq > highestConsec + 1)
-   → Register in pending map with detected timestamp
+   → Register in pending map with jitter hold-off
 
 2. Background sweeper (100ms interval)
-   → If gap > nack-gap-ttl and retries < nack-max-retries
-     → Dispatch NACK to all retry-endpoints
-     → Increment retries, update nextAttempt (exponential backoff)
+   → If past nextAttempt and retries < nack-max-retries:
+     → Select endpoint from registry snapshot (Tier ASC, Preference DESC)
+     → Open ephemeral UDP socket; send 56-byte NACK; wait ≤300ms
+     → ACK received: cancel gap entry
+     → MISS received: advance endpoint; retry immediately (no backoff)
+     → Timeout: exponential backoff; retry next sweep
 
-3. If retries exhausted
+3. If retries exhausted or GapTTL exceeded
    → Evict as bsl_gaps_unrecovered_total
+
+4. Multicast repair arrives independently
+   → Tracker.Fill() cancels pending gap regardless of NACK state
 ```
 
-**Exponential Backoff:**
+### Endpoint Discovery
 
-- Initial delay: `nack-gap-ttl` (default 10m)
-- Backoff multiplier: 2x
-- Maximum backoff: `nack-backoff-max` (default 5s)
+Retry endpoints advertise via periodic ADVERT beacons (see [BRC-125](docs/brc-125-retransmission-protocol.md)). Listeners join the site beacon group (`FF05::FF:FFFD`) and optionally the global beacon group (`FF0E::FF:FFFD`) to discover endpoints dynamically. Static `-retry-endpoints` seeds the registry at lowest priority (`Tier=0xFF, Preference=0`).
+
+Group address assignments for beacons and the control channel are defined in:
+
+**→ [BRC-126 Multicast Group Address Assignments](docs/brc-126-multicast-addressing.md)**
 
 ### Retry Endpoint Processing
 
-```
+```text
 1. Receive NACK on port 9300
 2. Rate limit check (IP, SenderID, SequenceID)
    → If exceeded: silent drop, increment bre_rate_limit_drops_total
-3. Cache lookup (TxID, SeqNum)
+3. Cache lookup by (SenderID, SequenceID, SeqNum)
    → If found in cache:
-     • Check dedup key (SenderID + SequenceID + SeqNum)
-     • If not recently retransmitted (Redis SET NX):
-       → Re-multicast to FF05::<shard>:9100
-       → Increment bre_retransmits_total
+     • Check dedup key (Redis SET NX, 60s window)
+     • If not recently retransmitted:
+       → Re-multicast to FF05::<shard>:9100 (if -retransmit-multicast)
+       → Unicast to NACK source (if -retransmit-unicast)
+       → Send 24-byte ACK unicast to NACK source (unless -suppress-ack)
      • Else: increment bre_retransmit_dedup_total
    → If not found:
+     → Send 24-byte MISS unicast to NACK source (unless -suppress-miss)
      → Increment bre_cache_misses_total
 ```
 
 ### Reliability Characteristics
 
-**Best-effort delivery:**
+**Best-effort delivery with deterministic escalation:**
 
-- Multicast is inherently unreliable (no ACKs)
-- NACK provides selective retransmission for detected gaps
-- No guarantee of recovery (network partition, cache expiration)
+- Multicast delivery is inherently unreliable
+- NACK + ACK/MISS provides deterministic gap recovery signalling
+- MISS triggers immediate escalation (no wasted backoff time)
+- Multicast repair path and NACK path are independent; either can fill a gap
+- No guarantee of recovery (network partition, cache expiration, all endpoints MISS)
 
 **Cache TTL considerations:**
 
@@ -686,11 +645,12 @@ Offset  Size  Field
 - Trade-off: Longer TTL = higher recovery probability, but more memory
 - Adjust based on expected gap detection latency and network conditions
 
-**Silent drops:**
+**Flood prevention:**
 
-- Bad frames (magic, version, payload size) are silently dropped
-- Rate-limited NACKs are silently dropped
-- Missing cache entries result in silent NACK drops
+- Redis `SET NX` dedup (60 s) prevents multi-endpoint retransmit of same frame
+- `SequenceIDRetransmit` marker prevents recaching of retransmitted frames
+- `Tracker.Fill()` suppresses pending NACKs on multicast repair arrival
+- Jitter hold-off and exponential backoff reduce NACK storm risk
 - All drops are counted in metrics
 
 ---
@@ -1051,5 +1011,33 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 
 ---
 
-_Document Version: 1.0_  
-_Last Updated: 2026-04-22_
+## Endpoint Discovery (BRC-125/126)
+
+Retry endpoint discoverability and hierarchical retransmission are defined across two BRCs:
+
+- **[BRC-125 — Retransmission Protocol](docs/brc-125-retransmission-protocol.md):** ADVERT beacon format, NACK/ACK/MISS wire formats, Tier/Preference model, escalation state machine, configurable retransmit modes, flood prevention.
+- **[BRC-126 — Multicast Group Address Assignments](docs/brc-126-multicast-addressing.md):** Control-plane group index reservations, beacon group addresses, site vs global scope, block template group reservation.
+
+### Summary
+
+- Retry endpoints send 56-byte ADVERT beacons every 60 s (configurable) to site (`FF05::FF:FFFD`) and/or global (`FF0E::FF:FFFD`) beacon groups.
+- Listeners join beacon groups at startup and maintain a dynamic `discovery.Registry` sorted by `(Tier ASC, Preference DESC)`.
+- Static `-retry-endpoints` seeds the registry at `Tier=0xFF, Preference=0` (lowest priority).
+- On NACK, the listener selects the highest-priority endpoint, sends a 56-byte NACK, and waits ≤300 ms for a 24-byte ACK or MISS response.
+- ACK cancels the gap; MISS advances to the next endpoint immediately; timeout triggers exponential backoff.
+- Inter-AS extension via MP-BGP requires no protocol changes.
+
+---
+
+## NACK Retransmission Flow
+
+The end-to-end NACK retransmission flow — from gap detection through escalation to repair delivery — is documented with ASCII diagrams in:
+
+**→ [NACK Retransmission Flow](docs/nack-retransmission-flow.md)**
+
+Covers: full pipeline diagram, gap detection & dispatch, tier model, preference within a tier, escalation state machine, beacon discovery, inter-AS extension, and flood prevention.
+
+---
+
+_Document Version: 1.1_  
+_Last Updated: 2026-05-03_
