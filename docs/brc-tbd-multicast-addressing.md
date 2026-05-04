@@ -1,8 +1,8 @@
-# BRC-126 — Multicast Group Address Assignments
+# BRC-TBD-addressing — Multicast Group Address Assignments
 
-BRC-126 defines the IPv6 multicast group address scheme for the BSV transaction sharding pipeline, including data-plane shard groups, control-plane beacon groups, and reserved indices.
+BRC-TBD-addressing defines the IPv6 multicast group address scheme for the BSV transaction sharding pipeline, including data-plane shard groups, control-plane beacon groups, and reserved indices.
 
-> **Status:** To be submitted as BRC-126 PR to jefflightweb/BRCs.
+> **Status:** To be submitted as BRC-TBD-addressing PR to jefflightweb/BRCs.
 
 ---
 
@@ -53,14 +53,14 @@ When middle bytes are configured (via `-mc-base-addr`), the same 11 bytes are in
 
 ## Beacon Groups
 
-Two beacon groups are defined to support both intra-site and inter-AS endpoint discovery (see [BRC-125](brc-125-retransmission-protocol.md)):
+Two beacon groups are defined to support both intra-site and inter-AS endpoint discovery (see [BRC-TBD-retransmission](brc-tbd-retransmission-protocol.md)):
 
 ### Site Beacon (`FF05::FF:FFFD` + middle bytes)
 
 - **Scope:** Site-local (`FF05`).
 - **Purpose:** Intra-site retry endpoint discovery. All listeners join this group at startup.
 - **Sender:** Every `bitcoin-retry-endpoint` with `-beacon-scope site` or `-beacon-scope both`.
-- **Content:** 56-byte ADVERT datagram (BRC-125).
+- **Content:** 56-byte ADVERT datagram (BRC-TBD-retransmission).
 
 ### Global Beacon (`FF0E::FF:FFFD` + middle bytes)
 

@@ -1,14 +1,14 @@
-# BRC-125 — Retransmission Protocol
+# BRC-TBD-retransmission — Retransmission Protocol
 
-BRC-125 defines the NACK-based retransmission and endpoint discovery protocol for the BSV multicast pipeline. It specifies the ADVERT beacon message, the MISS/ACK response messages, tier/preference-based endpoint selection, and configurable retransmit modes.
+BRC-TBD-retransmission defines the NACK-based retransmission and endpoint discovery protocol for the BSV multicast pipeline. It specifies the ADVERT beacon message, the MISS/ACK response messages, tier/preference-based endpoint selection, and configurable retransmit modes.
 
-> **Status:** To be submitted as BRC-125 PR to jefflightweb/BRCs.
+> **Status:** To be submitted as BRC-TBD-retransmission PR to jefflightweb/BRCs.
 
 ---
 
 ## Overview
 
-Retry endpoints cache BRC-124 frames received via multicast and respond to NACK requests from listeners experiencing gaps. BRC-125 adds:
+Retry endpoints cache BRC-124 frames received via multicast and respond to NACK requests from listeners experiencing gaps. BRC-TBD-retransmission adds:
 
 1. **ADVERT** — periodic multicast beacon advertising retry endpoint availability.
 2. **ACK/MISS** — unicast responses to every NACK, enabling deterministic escalation.
