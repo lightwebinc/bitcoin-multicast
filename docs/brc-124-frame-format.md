@@ -97,4 +97,4 @@ Offset  Size  Field
 ## Implementation
 
 - **Canonical source:** `bitcoin-shard-common/frame/frame.go`
-- **Constants:** `MagicBSV = 0xE3E1F3E8`, `ProtoVer = 0x02BF`, `FrameVerV1 = 0x01`, `FrameVerBRC124 = 0x02`, `HeaderSizeLegacy = 44`, `HeaderSize = 92`
+- **Constants:** `MagicBSV = 0xE3E1F3E8`, `ProtoVer = 0x02BF`, `FrameVerV1 = 0x01`, `FrameVerV2 = 0x02`, `HeaderSizeLegacy = 44`, `HeaderSize = 92`

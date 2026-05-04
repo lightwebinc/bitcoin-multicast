@@ -226,7 +226,7 @@ bitcoin-retry-endpoint
 │ • Receive NACK on port 9300                                             │
 │ • Rate limit (IP, SenderID, SequenceID)                                 │
 │ • Lookup frame in cache (memory or Redis)                               │
-│ • If found: re-multicast to FF05::<shard>:9100                          │
+│ • If found: re-multicast to FF05::<shard>:9001                          │
 │ • Dedup via Redis SET NX (60s window) to prevent duplicate retransmits  │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -458,7 +458,7 @@ Gap Tracker Sweeper (100ms interval)
 
 - `bsl_frames_received_total`, `bsl_frames_forwarded_total`, `bsl_frames_dropped_total`
 - `bsl_gaps_detected_total`, `bsl_gaps_suppressed_total`, `bsl_gaps_unrecovered_total`
-- `bsl_nacks_sent_total`, `bsl_nacks_unrecovered_total`
+- `bsl_nacks_dispatched_total`, `bsl_nacks_unrecovered_total`
 
 **Documentation:** [bitcoin-shard-listener README](https://github.com/lightwebinc/bitcoin-shard-listener), [architecture docs](https://github.com/lightwebinc/bitcoin-shard-listener/blob/main/docs/architecture.md)
 
@@ -491,7 +491,7 @@ NACK Server (NACK_WORKERS goroutines)
 
 Retransmit Egress
   ┌──────────────────┐
-  │ Multicast send   │──▶ FF05::<shard>:9100
+  │ Multicast send   │──▶ FF05::<shard>:9001
   └──────────────────┘
 ```
 
@@ -546,7 +546,7 @@ Retransmit Egress
 
 - `Encode(f *Frame, buf []byte) (int, error)`: Serialize frame to buffer
 - `Decode(buf []byte) (*Frame, error)`: Parse buffer to frame (zero-copy)
-- Constants: `MagicBSV`, `ProtoVer`, `FrameVerLegacy`, `FrameVerBRC122`, `HeaderSizeLegacy`, `HeaderSize`, `MaxPayload`
+- Constants: `MagicBSV`, `ProtoVer`, `FrameVerV1`, `FrameVerV2`, `HeaderSizeLegacy`, `HeaderSize`, `MaxPayload`
 - Errors: `ErrBadMagic`, `ErrBadVer`, `ErrTooLarge`, `ErrTooShort`
 
 **shard:** Deterministic txid → IPv6 multicast group derivation
@@ -620,7 +620,7 @@ Group address assignments for beacons and the control channel are defined in:
    → If found in cache:
      • Check dedup key (Redis SET NX, 60s window)
      • If not recently retransmitted:
-       → Re-multicast to FF05::<shard>:9100 (if -retransmit-multicast)
+       → Re-multicast to FF05::<shard>:9001 (if -retransmit-multicast)
        → Unicast to NACK source (if -retransmit-unicast)
        → Send 24-byte ACK unicast to NACK source (unless -suppress-ack)
      • Else: increment bre_retransmit_dedup_total
