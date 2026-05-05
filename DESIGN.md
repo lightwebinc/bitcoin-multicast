@@ -81,36 +81,36 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Core Services (Binaries)
 
-| Repository | Purpose |
-|---------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| [bitcoin-shard-proxy](https://github.com/lightwebinc/bitcoin-shard-proxy) | Stateless ingress proxy; receives frames, derives multicast group, forwards verbatim |
-| [bitcoin-shard-listener](https://github.com/lightwebinc/bitcoin-shard-listener) | Multicast subscriber; filters by shard/subtree, forwards to unicast consumers |
-| [bitcoin-retry-endpoint](https://github.com/lightwebinc/bitcoin-retry-endpoint) | Caches frames, retransmits on NACK requests |
+| Repository                                                                      | Purpose                                                                              |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [bitcoin-shard-proxy](https://github.com/lightwebinc/bitcoin-shard-proxy)       | Stateless ingress proxy; receives frames, derives multicast group, forwards verbatim |
+| [bitcoin-shard-listener](https://github.com/lightwebinc/bitcoin-shard-listener) | Multicast subscriber; filters by shard/subtree, forwards to unicast consumers        |
+| [bitcoin-retry-endpoint](https://github.com/lightwebinc/bitcoin-retry-endpoint) | Caches frames, retransmits on NACK requests                                          |
 
 ### Shared Libraries
 
-| Repository | Purpose | Packages |
-|-----------------------------------------------------------------------------|--------------------------------------------|------------------------------|
+| Repository                                                                  | Purpose                                    | Packages                     |
+| --------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------- |
 | [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) | Protocol primitives shared across services | `frame`, `shard`, `sequence` |
 
 ### Infrastructure Automation
 
-| Repository | Purpose | Deploys |
-|---------------------------------------------------------------------------------|-------------------------------------------------|------------------------|
-| [bitcoin-ingress](https://github.com/lightwebinc/bitcoin-ingress) | Ansible/Terraform for ingress proxy deployment | bitcoin-shard-proxy |
-| [bitcoin-listener](https://github.com/lightwebinc/bitcoin-listener) | Ansible/Terraform for listener deployment | bitcoin-shard-listener |
+| Repository                                                                      | Purpose                                         | Deploys                |
+| ------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------- |
+| [bitcoin-ingress](https://github.com/lightwebinc/bitcoin-ingress)               | Ansible/Terraform for ingress proxy deployment  | bitcoin-shard-proxy    |
+| [bitcoin-listener](https://github.com/lightwebinc/bitcoin-listener)             | Ansible/Terraform for listener deployment       | bitcoin-shard-listener |
 | [bitcoin-retransmission](https://github.com/lightwebinc/bitcoin-retransmission) | Ansible/Terraform for retry endpoint deployment | bitcoin-retry-endpoint |
 
 ### Testing and Tools
 
-| Repository | Purpose |
-|-----------------------------------------------------------------------------------|-----------------------------------------------|
+| Repository                                                                        | Purpose                                       |
+| --------------------------------------------------------------------------------- | --------------------------------------------- |
 | [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) | Traffic generator for load/functional testing |
 
 ### Meta Repository
 
-| Repository | Purpose |
-|-----------------------------------------------------------------------|------------------------------------------------------------|
+| Repository                                                            | Purpose                                                    |
+| --------------------------------------------------------------------- | ---------------------------------------------------------- |
 | [bitcoin-multicast](https://github.com/lightwebinc/bitcoin-multicast) | This repository; project overview and design documentation |
 
 ---
@@ -174,7 +174,7 @@ The project is organized into multiple repositories, each with a specific respon
 2. bitcoin-shard-proxy
    ┌─────────────────────────────────────────────────────────────────────────┐
    │ • Decode frame (extract TxID)                                           │
-   │ • Stamp Sender ID in-place (BRC-124 only, bytes 40-43)                  │
+   │ • Stamp PrevSeq/CurSeq in-place (BRC-124 only, bytes 40–55)             │
    │ • Derive multicast group: FF05::<groupIndex> from TxID top bits         │
    │ • Forward verbatim to all egress interfaces                             │
    └─────────────────────────────────────────────────────────────────────────┘
@@ -193,8 +193,8 @@ The project is organized into multiple repositories, each with a specific respon
    │ Miner / Exchange            │         │ • Join configured shard groups via MLD   │
    │ (consumes directly)         │         │ • Apply shard filter (defense-in-depth)  │
    └─────────────────────────────┘         │ • Apply subtree filter (include/exclude) │
-                                           │ • Track sequence gaps per (SenderID,     │
-                                           │   groupIndex)                            │
+                                           │ • Track sequence gaps per group          │
+                                           │   (PrevSeq/CurSeq hash-chain breaks)     │
                                            │ • Forward matching frames to egress_addr │
                                            │   (UDP or TCP, optional strip-header)    │
                                            └──────────────────────────────────────────┘
@@ -208,8 +208,8 @@ The project is organized into multiple repositories, each with a specific respon
 ```text
 bitcoin-shard-listener detects gap:
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ • SeqNum arrives > highestConsec + 1                                    │
-│ • Register missing seqs in pending map                                  │
+│ • PrevSeq ≠ lastCurSeq (hash-chain break detected)                      │
+│ • Register missing frame in pending map (key = incoming PrevSeq)        │
 │ • Background sweeper dispatches NACK after nack-gap-ttl                 │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -255,11 +255,11 @@ IPv6 group = [FFsc::groupIndex]
 **Example with shard_bits=2:**
 
 | txid[0:4] (hex) | txid[0:4] (uint32) | >> 30 | groupIndex | Multicast Address |
-|-----------------|--------------------|-------|------------|-------------------|
-| 0x12345678 | 305419896 | 0 | 0 | FF05::0 |
-| 0x87654321 | 2271560481 | 3 | 3 | FF05::3 |
-| 0xABCD1234 | 2882343444 | 2 | 2 | FF05::2 |
-| 0x4567ABCD | 1164413357 | 1 | 1 | FF05::1 |
+| --------------- | ------------------ | ----- | ---------- | ----------------- |
+| 0x12345678      | 305419896          | 0     | 0          | FF05::0           |
+| 0x87654321      | 2271560481         | 3     | 3          | FF05::3           |
+| 0xABCD1234      | 2882343444         | 2     | 2          | FF05::2           |
+| 0x4567ABCD      | 1164413357         | 1     | 1          | FF05::1           |
 
 ### Consistent Hashing Property
 
@@ -314,7 +314,7 @@ The BRC-124 data-plane frame format (92-byte header, replacing the legacy 44-byt
 
 **→ [BRC-124 Frame Format](docs/brc-124-frame-format.md)**
 
-Key fields: Network magic, Protocol version, Frame version, Transaction ID, Sender ID (CRC32c), Sequence ID, Shard Sequence Number, Subtree ID, Payload length, and BSV tx payload. Both v1 (legacy) and BRC-124 frames are accepted by all components.
+Key fields: Network magic, Protocol version, Frame version, Transaction ID, PrevSeq (XXH64, proxy-stamped), CurSeq (XXH64, proxy-stamped), Subtree ID, Payload length, and BSV tx payload. Both v1 (legacy) and BRC-124 frames are accepted by all components.
 
 ---
 
@@ -326,7 +326,7 @@ Key fields: Network magic, Protocol version, Frame version, Transaction ID, Send
 
 **Key Characteristics:**
 
-- Zero-copy forwarding: frame never modified after SenderID stamp
+- Zero-copy forwarding: frame never modified after PrevSeq/CurSeq stamp
 - Multi-CPU design: N UDP workers via SO_REUSEPORT + 1 TCP listener
 - Deterministic: same txid always maps to same group
 - Stateless: no coordination between workers or nodes required
@@ -355,7 +355,7 @@ TCP Listener (1 goroutine)
 **Hot Path:**
 
 1. `frame.Decode(raw)` → extract TxID
-2. Stamp Sender ID in-place (BRC-124 only): `raw[40:44] = CRC32c(sourceAddr.To16())`
+2. Stamp PrevSeq/CurSeq in-place (BRC-124 only): `raw[40:48]`, `raw[48:56]` = XXH64 hash chain per `(senderIPv6, groupIdx)`
 3. `shard.Engine.GroupIndex(txid)` → derive group
 4. `WriteTo(raw)` → write to all egress interfaces
 
@@ -386,7 +386,7 @@ TCP Listener (1 goroutine)
 
 - SO_REUSEPORT multi-worker receive (kernel-level source affinity)
 - Dual-level filtering: MLD group join + userspace shard/subtree filter
-- NORM-inspired gap tracking per (SenderID, groupIndex)
+- NORM-inspired gap tracking per group via PrevSeq/CurSeq hash chain
 - NACK dispatch to configurable retry endpoints
 - Egress via UDP or TCP (optional strip-header mode)
 
@@ -422,20 +422,20 @@ Gap Tracker Sweeper (100ms interval)
 
 **Filter Behavior:**
 
-| Config | Behavior |
-|-----------------------------|----------------------------------------|
-| `shard-include` empty | All shard indices accepted |
-| `shard-include` non-empty | Only listed indices accepted |
-| `subtree-include` empty | All SubtreeIDs accepted |
-| `subtree-include` non-empty | Only listed IDs accepted |
-| `subtree-exclude` | Listed IDs dropped (overrides include) |
+| Config                      | Behavior                               |
+| --------------------------- | -------------------------------------- |
+| `shard-include` empty       | All shard indices accepted             |
+| `shard-include` non-empty   | Only listed indices accepted           |
+| `subtree-include` empty     | All SubtreeIDs accepted                |
+| `subtree-include` non-empty | Only listed IDs accepted               |
+| `subtree-exclude`           | Listed IDs dropped (overrides include) |
 
 **Gap Tracking:**
 
-- State key: `(SenderID, groupIndex)`
-- Per-key state: `highestConsec`, `pending` map
-- When seq > highestConsec+1: register missing seqs in pending
-- When pending seq arrives: delete from pending, increment `bsl_gaps_suppressed_total`
+- State: per-group `lastCurSeq` and `pending` map
+- When `PrevSeq ≠ lastCurSeq`: register gap entry keyed on incoming `PrevSeq`
+- When incoming `CurSeq` matches a pending key: auto-close gap (multicast fill)
+- `Tracker.Fill(groupIdx, curSeq)` closes gap from explicit NACK ACK
 - Sweeper evicts expired gaps as `bsl_gaps_unrecovered_total`
 - NACK dispatch with exponential backoff (capped at `nack-backoff-max`)
 
@@ -472,7 +472,7 @@ Gap Tracker Sweeper (100ms interval)
 
 - Single-worker multicast receiver (SO_REUSEPORT limitation)
 - Modular cache backend: Redis (primary) or in-memory (fallback)
-- Three-level rate limiting: IP, SenderID, SequenceID
+- Three-level rate limiting: IP, per-sender sliding window, per-sequence counter
 - Cross-instance deduplication via Redis SET NX (60s window)
 - Sharding-based multicast egress for retransmitted frames
 
@@ -503,12 +503,12 @@ Retransmit Egress
 **Rate Limiting:**
 
 - IP level: Token bucket (rate + burst)
-- SenderID level: Sliding window per sender
-- SequenceID level: Max requests per sequence
+- Per-sender sliding window (senderID from NACK source IP)
+- Per-sequence counter (sequenceID from NACK)
 
 **Deduplication:**
 
-- Key: SenderID (4B) + SequenceID (4B) + SeqNum (4B) = 12B
+- Key: CurSeq (8B) — the unique XXH64 hash for the frame
 - Redis SET NX with 60s TTL prevents multiple endpoints from retransmitting the same frame
 
 **Configuration:**
@@ -614,18 +614,18 @@ Group address assignments for beacons and the control channel are defined in:
 
 ```text
 1. Receive NACK on port 9300
-2. Rate limit check (IP, SenderID, SequenceID)
+2. Rate limit check (IP)
    → If exceeded: silent drop, increment bre_rate_limit_drops_total
-3. Cache lookup by (SenderID, SequenceID, SeqNum)
+3. Cache lookup by LookupType + LookupSeq (dual-index)
    → If found in cache:
      • Check dedup key (Redis SET NX, 60s window)
      • If not recently retransmitted:
        → Re-multicast to FF05::<shard>:9001 (if -retransmit-multicast)
        → Unicast to NACK source (if -retransmit-unicast)
-       → Send 24-byte ACK unicast to NACK source (unless -suppress-ack)
+       → Send 16-byte ACK unicast to NACK source (unless -suppress-ack)
      • Else: increment bre_retransmit_dedup_total
    → If not found:
-     → Send 24-byte MISS unicast to NACK source (unless -suppress-miss)
+     → Send 16-byte MISS unicast to NACK source (unless -suppress-miss)
      → Increment bre_cache_misses_total
 ```
 
@@ -775,11 +775,11 @@ make test-e2e
 
 ### Platform Support
 
-| OS | Service Manager | Network Config | Proxy | Listener | Retry |
-|--------------|-----------------|--------------------|-------|----------|-------|
-| Ubuntu 24.04 | systemd | Netplan / ip | ✓ | ✓ | ✓ |
-| FreeBSD 14 | rc.d | rc.conf / ifconfig | ✓ | ✓ | ✓ |
-| AWS EC2 | systemd | ENI + Terraform | ✓ | ✓ | ✓ |
+| OS           | Service Manager | Network Config     | Proxy | Listener | Retry |
+| ------------ | --------------- | ------------------ | ----- | -------- | ----- |
+| Ubuntu 24.04 | systemd         | Netplan / ip       | ✓     | ✓        | ✓     |
+| FreeBSD 14   | rc.d            | rc.conf / ifconfig | ✓     | ✓        | ✓     |
+| AWS EC2      | systemd         | ENI + Terraform    | ✓     | ✓        | ✓     |
 
 ### Networking Requirements
 
@@ -1003,10 +1003,10 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 ### Frame Version Summary
 
 ```text
-| Version | Header Size | Sequence Support | Subtree Support | SenderID |
-|---------|-------------|------------------|-----------------|----------|
-| v1      | 44 bytes    | No               | No              | No       |
-| BRC-124 | 92 bytes    | Yes              | Yes             | Yes      |
+| Version | Header Size | Hash-Chain Seq | Subtree Support |
+|---------|-------------|----------------|-----------------|
+| v1      | 44 bytes    | No             | No              |
+| BRC-124 | 92 bytes    | Yes (PrevSeq/CurSeq) | Yes        |
 ```
 
 ---
