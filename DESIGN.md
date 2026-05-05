@@ -216,7 +216,7 @@ bitcoin-shard-listener detects gap:
                                     ▼
 NACK Dispatch (UDP to retry-endpoint:9300)
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ 56-byte NACK datagram: (Magic, TxID, SenderID, SequenceID, SeqNum)      │
+│ 24-byte NACK datagram: (Magic, LookupType, LookupSeq)                   │
 │ Sent to all configured retry endpoints one after another                │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -570,13 +570,13 @@ Retransmit Egress
 
 ### NACK Protocol (BRC-TBD-retransmission)
 
-Listeners detect sequence gaps and send 56-byte NACK datagrams to retry endpoints. The full wire format, response protocol, and escalation state machine are defined in:
+Listeners detect sequence gaps and send 24-byte NACK datagrams to retry endpoints. The full wire format, response protocol, and escalation state machine are defined in:
 
 **→ [BRC-TBD-retransmission (Retransmission Protocol)](docs/brc-tbd-retransmission-protocol.md)**
 
 **Key changes from the original fire-and-forget NACK model:**
 
-- **ACK/MISS responses** — every NACK receives a unicast response (24 bytes). ACK confirms retransmit dispatched; MISS indicates cache miss and triggers immediate escalation to the next endpoint.
+- **ACK/MISS responses** — every NACK receives a unicast response (16 bytes). ACK confirms retransmit dispatched; MISS indicates cache miss and triggers immediate escalation to the next endpoint.
 - **Beacon discovery** — retry endpoints periodically multicast ADVERT messages (56 bytes) to site/global beacon groups. Listeners maintain a dynamic endpoint registry, sorted by `(Tier ASC, Preference DESC)`.
 - **Tier-based escalation** — on MISS, listeners advance through endpoints at the same tier, then escalate to the next tier. No backoff on MISS; immediate retry.
 - **Configurable retransmit modes** — endpoints can retransmit via multicast, unicast, or both. Responses can be selectively suppressed.
@@ -590,7 +590,7 @@ Listeners detect sequence gaps and send 56-byte NACK datagrams to retry endpoint
 2. Background sweeper (100ms interval)
    → If past nextAttempt and retries < nack-max-retries:
      → Select endpoint from registry snapshot (Tier ASC, Preference DESC)
-     → Open ephemeral UDP socket; send 56-byte NACK; wait ≤300ms
+     → Open ephemeral UDP socket; send 24-byte NACK; wait ≤300ms
      → ACK received: cancel gap entry
      → MISS received: advance endpoint; retry immediately (no backoff)
      → Timeout: exponential backoff; retry next sweep
@@ -1023,7 +1023,7 @@ Retry endpoint discoverability and hierarchical retransmission are defined acros
 - Retry endpoints send 56-byte ADVERT beacons every 60 s (configurable) to site (`FF05::FF:FFFD`) and/or global (`FF0E::FF:FFFD`) beacon groups.
 - Listeners join beacon groups at startup and maintain a dynamic `discovery.Registry` sorted by `(Tier ASC, Preference DESC)`.
 - Static `-retry-endpoints` seeds the registry at `Tier=0xFF, Preference=0` (lowest priority).
-- On NACK, the listener selects the highest-priority endpoint, sends a 56-byte NACK, and waits ≤300 ms for a 24-byte ACK or MISS response.
+- On NACK, the listener selects the highest-priority endpoint, sends a 24-byte NACK, and waits ≤300 ms for a 16-byte ACK or MISS response.
 - ACK cancels the gap; MISS advances to the next endpoint immediately; timeout triggers exponential backoff.
 - Inter-AS extension via MP-BGP requires no protocol changes.
 

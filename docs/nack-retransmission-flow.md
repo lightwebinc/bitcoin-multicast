@@ -11,15 +11,15 @@ System-level design document describing the end-to-end NACK retransmission pipel
                          ┌────────────────────────────────────────────────┐
                          │                                                │
 BSV Source ──► bitcoin-shard-proxy ──┬──► listener-1 ──► downstream consumer
-              (stamps SenderID)     │
+              (stamps PrevSeq/CurSeq)│
                                     ├──► listener-2 ──► downstream consumer
                                     │
                                     └──► bitcoin-retry-endpoint (caches all frames)
 ```
 
-- **Proxy** receives transactions, stamps `SenderID` (CRC32c of source IPv6), derives shard group from TxID, multicasts to `FF05::<shard>`.
-- **Listeners** subscribe to shard groups, decode frames, track per-sender sequence numbers, forward to consumers.
-- **Retry endpoint** subscribes to all shard groups, caches raw frames keyed by `(SenderID, SequenceID, SeqNum)`.
+- **Proxy** receives transactions, stamps `PrevSeq`/`CurSeq` (XXH64 hash chain per sender+group), derives shard group from TxID, multicasts to `FF05::<shard>`.
+- **Listeners** subscribe to shard groups, decode frames, track per-group PrevSeq/CurSeq chain breaks, forward to consumers.
+- **Retry endpoint** subscribes to all shard groups, caches raw frames indexed by `CurSeq` (primary) and `PrevSeq` (secondary).
 
 ---
 
@@ -29,8 +29,8 @@ BSV Source ──► bitcoin-shard-proxy ──┬──► listener-1 ──►
 Listener receives:  Seq 1, 2, 3, [gap], 6, 7, ...
                               │
                               ▼
-              Gap detected: Seq 4, 5 missing
-              Key: (SenderID=0xABCD, SequenceID=0x1234, SeqNum=4)
+              Gap detected: prevSeq=X, curSeq=Z but expected prevSeq=lastCurSeq
+              Key: CurSeq of the missing frame (= incoming PrevSeq)
                               │
                     ┌─────────┴──────────┐
                     ▼                    ▼
@@ -38,7 +38,7 @@ Listener receives:  Seq 1, 2, 3, [gap], 6, 7, ...
             (suppression)        in Tracker.pending
                     │
                     ▼
-              NACK dispatched (56 bytes, unicast UDP)
+              NACK dispatched (24 bytes, unicast UDP)
               to retry endpoint from registry snapshot
                     │
                     ▼
@@ -57,7 +57,7 @@ Listener receives:  Seq 1, 2, 3, [gap], 6, 7, ...
                 endpoint   & retry
 ```
 
-The NACK carries the `(SenderID, SequenceID, SeqNum)` triple identifying the missing frame. The listener opens a per-request ephemeral UDP socket (`[::]:0`), sends the NACK, and waits up to 300 ms for a single response.
+The NACK carries a `LookupType` (by `PrevSeq` or by `CurSeq`) and the corresponding `LookupSeq` XXH64 value identifying the missing frame. The listener opens a per-request ephemeral UDP socket (`[::]:0`), sends the NACK, and waits up to 300 ms for a single response.
 
 ---
 

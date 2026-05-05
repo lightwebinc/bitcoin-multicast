@@ -11,7 +11,7 @@ BRC-TBD-retransmission defines the NACK-based retransmission and endpoint discov
 Retry endpoints cache BRC-124 frames received via multicast and respond to NACK requests from listeners experiencing gaps. BRC-TBD-retransmission adds:
 
 1. **ADVERT** — periodic multicast beacon advertising retry endpoint availability.
-2. **ACK/MISS** — unicast responses to every NACK, enabling deterministic escalation.
+2. **ACK/MISS responses** — every NACK receives a unicast response (16 bytes).
 3. **Tier/Preference** — hierarchical endpoint selection for multi-AS deployments.
 4. **Configurable retransmit modes** — multicast, unicast, or both.
 
@@ -53,9 +53,9 @@ Offset  Size  Field
 
 ---
 
-## NACK Wire Format (`MsgType 0x10`) — 56 bytes
+## NACK Wire Format (`MsgType 0x10`) — 24 bytes
 
-Unchanged from existing implementation. Sent by listener to retry endpoint on gap detection.
+Sent by listener to retry endpoint on gap detection. Requests a frame by its `CurSeq` (backward lookup) or by its `PrevSeq` (forward lookup).
 
 ```text
 Offset  Size  Field
@@ -63,17 +63,14 @@ Offset  Size  Field
      0     4  Magic (0xE3E1F3E8)
      4     2  ProtoVer (0x02BF)
      6     1  MsgType = 0x10 (NACK)
-     7     1  Reserved = 0x00
-     8    32  TxID               — identifies the missing frame (best-effort)
-    40     4  SenderID           — CRC32c of sender IPv6; 0 = unknown
-    44     4  SequenceID         — flow identifier; 0 = unknown
-    48     4  SeqNum             — sender's sequence number; 0 = unknown
-    52     4  Reserved           — padding; must be 0x00000000
+     7     1  LookupType  — 0x00 = by PrevSeq (forward), 0x01 = by CurSeq (backward)
+     8     8  LookupSeq   — XXH64 value to look up in the cache
+    16     8  Reserved    — must be 0x0000000000000000
 ```
 
 ---
 
-## MISS Response (`MsgType 0x11`) — 24 bytes
+## MISS Response (`MsgType 0x11`) — 16 bytes
 
 Sent unicast to the NACK source when the requested frame is not in cache. Listener advances to next endpoint immediately (no backoff wait).
 
@@ -84,15 +81,12 @@ Offset  Size  Field
      4     2  ProtoVer (0x02BF)
      6     1  MsgType = 0x11 (MISS)
      7     1  Flags (reserved 0x00)
-     8     4  SenderID    — echoed from NACK
-    12     4  SequenceID  — echoed from NACK
-    16     4  SeqNum      — echoed from NACK
-    20     4  Reserved
+     8     8  CurSeq — always 0 on MISS
 ```
 
 ---
 
-## ACK Response (`MsgType 0x12`) — 24 bytes
+## ACK Response (`MsgType 0x12`) — 16 bytes
 
 Sent unicast to the NACK source when the frame is found and retransmit dispatched. Listener suppresses further NACKs for this gap immediately.
 
@@ -102,14 +96,9 @@ Offset  Size  Field
      0     4  Magic (0xE3E1F3E8)
      4     2  ProtoVer (0x02BF)
      6     1  MsgType = 0x12 (ACK)
-     7     1  Flags (0x01=multicast_sent, 0x02=unicast_sent)
-     8     4  SenderID    — echoed from NACK
-    12     4  SequenceID  — echoed from NACK
-    16     4  SeqNum      — echoed from NACK
-    20     4  Reserved
+     7     1  Flags (0x01=multicast_sent)
+     8     8  CurSeq — CurSeq of the retransmitted frame
 ```
-
-`ACK.Flags` tells the listener which delivery method was used, allowing it to either wait for the multicast fill or accept the unicast frame directly.
 
 ---
 
