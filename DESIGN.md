@@ -782,7 +782,7 @@ All services handle SIGINT/SIGTERM identically: set draining flag (`/readyz` →
 
 The IPv6 multicast transaction broadcast architecture from which this software draws inspiration was articulated by Dr. Craig S. Wright:
 
-- [Multicast within Multicast: Anycast](https://singulargrit.substack.com/p/multicast-within-multicast-anycast)
+- [Multicast Within Multicast: Anycast, Sharded Resends, and Hierarchical Distribution for Transaction and Block Propagation](https://singulargrit.substack.com/p/multicast-within-multicast-anycast)
 - [Multicast as the Only Viable Architecture](https://singulargrit.substack.com/p/multicast-as-the-only-viable-architecture)
 - [Singulargrit Substack](https://singulargrit.substack.com/)
 
