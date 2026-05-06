@@ -1,4 +1,4 @@
-# Bitcoin Multicast Project Design Document
+# Bitcoin Multicast
 
 ## Overview
 
