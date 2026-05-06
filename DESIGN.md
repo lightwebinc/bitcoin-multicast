@@ -91,7 +91,7 @@ The project is organized into multiple repositories, each with a specific respon
 
 | Repository                                                                  | Purpose                                    | Packages                     |
 | --------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------- |
-| [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) | Protocol primitives shared across services | `frame`, `shard`, `sequence` |
+| [bitcoin-shard-common](https://github.com/lightwebinc/bitcoin-shard-common) | Protocol primitives shared across services | `frame`, `shard`, `seqhash`, `sequence` |
 
 ### Infrastructure Automation
 
@@ -360,22 +360,7 @@ TCP Listener (1 goroutine)
 3. `shard.Engine.GroupIndex(txid)` → derive group
 4. `WriteTo(raw)` → write to all egress interfaces
 
-**Configuration:**
-
-- `-iface`: Egress interface(s) (comma-separated)
-- `-shard-bits`: Txid prefix bit width (1-24, default 16)
-- `-scope`: Multicast scope (link|site|org|global, default site)
-- `-udp-listen-port`: UDP ingress port (default 9000)
-- `-tcp-listen-port`: TCP ingress port (0 = disabled)
-- `-egress-port`: Multicast egress port (default 9001)
-
-**Metrics (bsp\_ prefix):**
-
-- `bsp_packets_received_total`, `bsp_packets_forwarded_total`, `bsp_packets_dropped_total`
-- `bsp_bytes_received_total`, `bsp_bytes_forwarded_total`
-- `bsp_tcp_connections_total`, `bsp_tcp_errors_total`
-
-**Documentation:** [bitcoin-shard-proxy README](https://github.com/lightwebinc/bitcoin-shard-proxy), [architecture docs](https://github.com/lightwebinc/bitcoin-shard-proxy/blob/main/docs/architecture.md)
+**→ [bitcoin-shard-proxy docs](https://github.com/lightwebinc/bitcoin-shard-proxy/blob/main/docs/architecture.md)** — architecture, configuration reference, metrics
 
 ---
 
@@ -440,28 +425,7 @@ Gap Tracker Sweeper (100ms interval)
 - Sweeper evicts expired gaps as `bsl_gaps_unrecovered_total`
 - NACK dispatch with exponential backoff (capped at `nack-backoff-max`)
 
-**Configuration:**
-
-- `-iface`: Ingress interface for multicast receive
-- `-listen-port`: Multicast listen port (default 9001)
-- `-shard-bits`: Txid prefix bit width (1-24, default 16)
-- `-shard-include`: Comma-separated shard indices to accept (empty = all)
-- `-subtree-include`: Comma-separated 32-byte hex SubtreeIDs to accept
-- `-subtree-exclude`: Comma-separated 32-byte hex SubtreeIDs to drop
-- `-egress-addr`: Downstream consumer address (UDP or TCP)
-- `-egress-proto`: udp or tcp (default udp)
-- `-strip-header`: Send payload only (default false)
-- `-retry-endpoints`: Comma-separated retry endpoint addresses
-- `-nack-gap-ttl`: Maximum time to attempt gap recovery before evicting (default 10m)
-- `-nack-max-retries`: Maximum NACK retries per gap (default 5)
-
-**Metrics (bsl\_ prefix):**
-
-- `bsl_frames_received_total`, `bsl_frames_forwarded_total`, `bsl_frames_dropped_total`
-- `bsl_gaps_detected_total`, `bsl_gaps_suppressed_total`, `bsl_gaps_unrecovered_total`
-- `bsl_nacks_dispatched_total`, `bsl_nacks_unrecovered_total`
-
-**Documentation:** [bitcoin-shard-listener README](https://github.com/lightwebinc/bitcoin-shard-listener), [architecture docs](https://github.com/lightwebinc/bitcoin-shard-listener/blob/main/docs/architecture.md)
+**→ [bitcoin-shard-listener docs](https://github.com/lightwebinc/bitcoin-shard-listener/blob/main/docs/architecture.md)** — architecture, configuration reference, metrics
 
 ---
 
@@ -496,73 +460,19 @@ Retransmit Egress
   └──────────────────┘
 ```
 
-**Cache Backends:**
+**Cache:** in-memory (freecache, 60 s TTL, single-node) or Redis (shared cache, multi-node dedup via SET NX).
 
-- **memory:** In-memory cache; single-node deployments
-- **redis:** External Redis cluster; multi-node deployments, shared cache
-
-**Rate Limiting:**
-
-- IP level: Token bucket (rate + burst)
-- Per-LookupSeq sliding window (prevents repeated NACKs for the same frame)
-
-**Deduplication:**
-
-- Key: CurSeq (8B) — the unique XXH64 hash for the frame
-- Redis SET NX with 60s TTL prevents multiple endpoints from retransmitting the same frame
-
-**Configuration:**
-
-- `-mc-iface`: Multicast ingress interface
-- `-listen-port`: Multicast listen port (default 9001)
-- `-shard-bits`: Txid prefix bit width (1-24, default 16)
-- `-cache-backend`: redis or memory (default memory)
-- `-redis-addr`: Redis server address (default localhost:6379)
-- `-cache-ttl`: Cache TTL (default 60s)
-- `-nack-port`: NACK listen port (default 9300)
-- `-nack-workers`: NACK worker goroutines (default NumCPU)
-- `-egress-iface`: Egress interface(s) for retransmission
-- `-egress-port`: Retransmission port (default 9001)
-- `-dedup-window`: Deduplication window (default 60s)
-
-**Metrics (bre\_ prefix):**
-
-- `bre_cache_hits_total`, `bre_cache_misses_total`, `bre_cache_size`
-- `bre_nack_requests_total`, `bre_retransmits_total`, `bre_retransmit_dedup_total`
-- `bre_rate_limit_drops_total{level=ip|sequence}`
-- `bre_frames_received_total`, `bre_frames_cached_total`
-
-**Documentation:** [bitcoin-retry-endpoint README](https://github.com/lightwebinc/bitcoin-retry-endpoint)
+**→ [bitcoin-retry-endpoint README](https://github.com/lightwebinc/bitcoin-retry-endpoint)** — configuration reference, metrics
 
 ---
 
 ### bitcoin-shard-common (Protocol Primitives)
 
-**Purpose:** Shared protocol primitives for the BSV transaction sharding pipeline.
+**Purpose:** Shared protocol primitives imported by proxy, listener, and retry endpoint.
 
-**Packages:**
+**Packages:** `frame` (v1/BRC-124 encode/decode), `shard` (txid → multicast group derivation), `seqhash` (XXH64 hash chain for PrevSeq/CurSeq), `sequence` (per-shard monotonic counters).
 
-**frame:** v1/BRC-124 wire format encoding/decoding
-
-- `Encode(f *Frame, buf []byte) (int, error)`: Serialize frame to buffer
-- `Decode(buf []byte) (*Frame, error)`: Parse buffer to frame (zero-copy)
-- Constants: `MagicBSV`, `ProtoVer`, `FrameVerV1`, `FrameVerV2`, `HeaderSizeLegacy`, `HeaderSize`, `MaxPayload`
-- Errors: `ErrBadMagic`, `ErrBadVer`, `ErrTooLarge`, `ErrTooShort`
-
-**shard:** Deterministic txid → IPv6 multicast group derivation
-
-- `Engine`: Immutable sharding parameters (mcPrefix, middleBytes, shardBits)
-- `GroupIndex(txid *[32]byte) uint32`: Extract group index from txid
-- `Addr(groupIndex uint32, port int) *net.UDPAddr`: Construct multicast address
-- Consistent hashing: increasing shardBits splits groups without invalidating existing subscriptions
-
-**sequence:** Per-shard monotonic sequence counters
-
-- Per-shard atomic.Uint64 counters
-- Zero allocation, no contention between shards
-- Used for proxy-side sequence numbering (currently unused in main binary)
-
-**Documentation:** [bitcoin-shard-common README](https://github.com/lightwebinc/bitcoin-shard-common), [protocol spec](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md)
+**→ [bitcoin-shard-common README](https://github.com/lightwebinc/bitcoin-shard-common)** — package API, [protocol spec](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md)
 
 ---
 
@@ -713,40 +623,9 @@ With N=8 subtrees and a fixed seed, the same txid always maps to the same subtre
 
 **Purpose:** Random BSV-shaped frame generator for load and functional testing.
 
-**Features:**
+**Features:** random BSV-shaped payloads, deterministic subtree ID pool, optional gap injection (`-seq-gap-every`, `-seq-gap-delay`) for NACK/retransmit tests, multi-core token-bucket pacer.
 
-- Random BSV-shaped tx payloads (version/vin/vout/locktime)
-- Subtree ID pool (N deterministic 32-byte IDs from seed)
-- Sequence numbers with optional gap injection (permanent or delayed retransmission)
-- Multi-core sender (one UDP conn per worker)
-- Token-bucket pacer (smooth at ≤1 kpps, burst mode above)
-
-**Usage Examples:**
-
-```bash
-# Basic load test
-subtx-gen \
-  -addr [::1]:9000 \
-  -frame-version 2 \
-  -shard-bits 2 \
-  -subtrees 8 \
-  -subtree-seed 'test-seed' \
-  -pps 1000 \
-  -duration 10s \
-  -payload-size 512 \
-  -workers 0
-
-# Gap injection (NACK/retransmit test)
-subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
-
-# Delayed retransmit (gap recovery test)
-subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
-
-# Inspect subtree pool
-subtx-gen -subtrees 8 -subtree-seed 'test-seed' -print-subtrees
-```
-
-**Documentation:** [bitcoin-subtx-generator README](https://github.com/lightwebinc/bitcoin-subtx-generator)
+**→ [bitcoin-subtx-generator README](https://github.com/lightwebinc/bitcoin-subtx-generator)** — usage examples, flags
 
 ### bitcoin-shard-listener E2E Tests
 
@@ -876,54 +755,11 @@ All services expose Prometheus metrics on dedicated ports:
 | bitcoin-retry-endpoint | :9400        | bre_   |
 ```
 
-**Key Metrics to Monitor:**
-
-**Proxy:**
-
-- `bsp_packets_dropped_total{reason}`: Packet loss reasons
-- `bsp_bytes_forwarded_total`: Throughput
-- `bsp_tcp_errors_total`: TCP ingress errors
-
-**Listener:**
-
-- `bsl_frames_dropped_total{reason}`: Drop reasons (shard_filter, subtree_exclude, etc.)
-- `bsl_gaps_detected_total`: Gap detection rate
-- `bsl_gaps_suppressed_total`: Successful gap recovery
-- `bsl_nacks_unrecovered_total`: Unrecoverable gaps
-
-**Retry Endpoint:**
-
-- `bre_cache_misses_total`: Cache effectiveness
-- `bre_retransmit_dedup_total`: Duplicate suppression
-- `bre_rate_limit_drops_total{level}`: Rate limit violations
+Key signals: `bsp_packets_dropped_total`, `bsl_gaps_detected_total`, `bsl_gaps_unrecovered_total`, `bre_cache_misses_total`, `bre_rate_limit_drops_total`. See each component's docs for full metric reference.
 
 ### Graceful Shutdown
 
-All services support graceful shutdown via SIGINT/SIGTERM:
-
-**Proxy:**
-
-1. Drain: Set draining flag, `/readyz` returns 503
-2. Optional drain timeout (configurable)
-3. Close ingress sockets
-4. Wait for in-flight processing
-5. Flush OTLP exporter
-
-**Listener:**
-
-1. Drain: Set draining flag, `/readyz` returns 503
-2. Optional drain timeout (configurable)
-3. Close ingress sockets
-4. Wait for in-flight processing
-5. Flush OTLP exporter
-
-**Retry Endpoint:**
-
-1. Drain: Set draining flag, `/readyz` returns 503
-2. Optional drain timeout (configurable)
-3. Close ingress sockets
-4. Wait for in-flight processing
-5. Flush OTLP exporter
+All services handle SIGINT/SIGTERM identically: set draining flag (`/readyz` → 503), optional drain timeout, close ingress sockets, wait for in-flight processing, flush OTLP exporter.
 
 ---
 
