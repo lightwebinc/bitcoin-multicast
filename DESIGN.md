@@ -479,7 +479,7 @@ Retransmit Egress
 
 Listeners detect sequence gaps and send 24-byte NACK datagrams to retry endpoints. The full wire format, response protocol, and escalation state machine are defined in:
 
-**→ [BRC-126 (Retransmission Protocol)](docs/brc-tbd-retransmission-protocol.md)**
+**→ [BRC-126 (Retransmission Protocol)](docs/brc-126-retransmission-protocol.md)**
 
 **Key changes from the original fire-and-forget NACK model:**
 
@@ -511,7 +511,7 @@ Listeners detect sequence gaps and send 24-byte NACK datagrams to retry endpoint
 
 ### Endpoint Discovery
 
-Retry endpoints advertise via periodic ADVERT beacons (see [BRC-126](docs/brc-tbd-retransmission-protocol.md)). Listeners join the site beacon group (`FF05::FF:FFFD`) and optionally the global beacon group (`FF0E::FF:FFFD`) to discover endpoints dynamically. Static `-retry-endpoints` seeds the registry at lowest priority (`Tier=0xFF, Preference=0`).
+Retry endpoints advertise via periodic ADVERT beacons (see [BRC-126](docs/brc-126-retransmission-protocol.md)). Listeners join the site beacon group (`FF05::FF:FFFD`) and optionally the global beacon group (`FF0E::FF:FFFD`) to discover endpoints dynamically. Static `-retry-endpoints` seeds the registry at lowest priority (`Tier=0xFF, Preference=0`).
 
 Group address assignments for beacons and the control channel are defined in:
 
@@ -838,7 +838,7 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 
 Retry endpoint discoverability and hierarchical retransmission are defined across two BRCs:
 
-- **[BRC-126 — Retransmission Protocol](docs/brc-tbd-retransmission-protocol.md):** ADVERT beacon format, NACK/ACK/MISS wire formats, Tier/Preference model, escalation state machine, configurable retransmit modes, flood prevention.
+- **[BRC-126 — Retransmission Protocol](docs/brc-126-retransmission-protocol.md):** ADVERT beacon format, NACK/ACK/MISS wire formats, Tier/Preference model, escalation state machine, configurable retransmit modes, flood prevention.
 - **[BRC-TBD-addressing — Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md):** Control-plane group index reservations, beacon group addresses, site vs global scope, block template group reservation.
 
 ### Summary

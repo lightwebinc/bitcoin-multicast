@@ -54,7 +54,7 @@ When middle bytes are configured (via `-mc-base-addr`), the same 11 bytes are in
 
 ## Beacon Groups
 
-Three beacon groups are defined to support intra-site, organisation-wide, and inter-AS endpoint discovery (see [BRC-126](brc-tbd-retransmission-protocol.md)). Each `bitcoin-retry-endpoint` instance beacons to **exactly one** group (set via `-beacon-scope`). Deployments that need coverage across multiple scopes run separate instances at each scope.
+Three beacon groups are defined to support intra-site, organisation-wide, and inter-AS endpoint discovery (see [BRC-126](brc-126-retransmission-protocol.md)). Each `bitcoin-retry-endpoint` instance beacons to **exactly one** group (set via `-beacon-scope`). Deployments that need coverage across multiple scopes run separate instances at each scope.
 
 ### Site Beacon (`FF05::FF:FFFD` + middle bytes)
 
