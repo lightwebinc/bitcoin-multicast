@@ -224,10 +224,11 @@ NACK Dispatch (UDP to retry-endpoint:9300)
 bitcoin-retry-endpoint
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ • Receive NACK on port 9300                                             │
-│ • Rate limit (IP, LookupSeq)                                             │
+│ • Rate limit (IP, LookupSeq)                                            │
 │ • Lookup frame in cache (memory or Redis)                               │
 │ • If found: re-multicast to FF05::<shard>:9001                          │
-│ • Dedup via Redis SET NX (60s window) to prevent duplicate retransmits  │
+│ • Dedup via backend (Redis SET NX, Kafka, etc) (60s window)             │
+│   to prevent duplicate retransmits                                      │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -314,7 +315,7 @@ The BRC-124 data-plane frame format (92-byte header, replacing the legacy 44-byt
 
 **→ [BRC-124 Frame Format](docs/brc-124-frame-format.md)**
 
-Key fields: Network magic, Protocol version, Frame version, Transaction ID, PrevSeq (XXH64, proxy-stamped), CurSeq (XXH64, proxy-stamped), Subtree ID, Payload length, and BSV tx payload. Both v1 (legacy) and BRC-124 frames are accepted by all components.
+Key fields: Network magic, Protocol version, Frame version, Transaction ID, PrevSeq (XXH64), CurSeq (XXH64), Subtree ID, Payload length, and BSV tx payload. Both v1 (legacy) and BRC-124 frames are accepted by all components.
 
 ---
 
@@ -355,7 +356,7 @@ TCP Listener (1 goroutine)
 **Hot Path:**
 
 1. `frame.Decode(raw)` → extract TxID
-2. Stamp PrevSeq/CurSeq in-place (BRC-124 only): `raw[40:48]`, `raw[48:56]` = XXH64 hash chain per `(senderIPv6, groupIdx)`
+2. If CurSeq (`raw[48:56]`) is non-zero: sender pre-stamped; forward verbatim. Else stamp `raw[40:48]` (PrevSeq) and `raw[48:56]` (CurSeq) = XXH64 hash chain per `(senderIPv6, groupIdx)`
 3. `shard.Engine.GroupIndex(txid)` → derive group
 4. `WriteTo(raw)` → write to all egress interfaces
 
