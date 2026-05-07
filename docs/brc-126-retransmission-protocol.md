@@ -65,8 +65,10 @@ Offset  Size  Field
      6     1  MsgType = 0x10 (NACK)
      7     1  LookupType  — 0x00 = by PrevSeq (forward), 0x01 = by CurSeq (backward)
      8     8  LookupSeq   — XXH64 value to look up in the cache
-    16     8  Reserved    — must be 0x0000000000000000
+    16     8  ChainID     — initial CurSeq of the hash-chain; 0x0 = gap not yet chain-attributed
 ```
+
+> **ChainID** (offset 16) repurposes the former Reserved field (was all-zeros). It carries the `chainID` assigned by the listener's multi-chain gap tracker — the `CurSeq` of the first frame observed for this chain. The retry endpoint uses ChainID as an additional rate-limiting key (per-flow NACK storm cap). A value of `0` means the gap is an orphan — it was detected before the chain that spawned it has been identified (the connecting frame has not yet arrived). Rate-limiting on `ChainID=0` would bucket all unattributed gaps from the same source together and prematurely exhaust a shared limit, so the chain check is skipped for `ChainID=0`; the gap remains subject to the IP and per-LookupSeq tiers.
 
 ---
 
