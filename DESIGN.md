@@ -434,7 +434,7 @@ Gap Tracker Sweeper (100ms interval)
 
 - Single-worker multicast receiver (SO_REUSEPORT limitation)
 - In-memory cache (freecache, 60 s TTL, GC-free, dual-index by CurSeq and PrevSeq)
-- Two-level rate limiting: per-IP token bucket, per-LookupSeq sliding window
+- Multi-tier rate limiting: per-IP, per-chain (ChainID), per-sequence (LookupSeq) pre-lookup; per-group (groupIdx) post-lookup (ACK still sent on throttle)
 - Sharding-based multicast egress for retransmitted frames
 
 **Architecture:**
@@ -520,16 +520,21 @@ Group address assignments for beacons and the control channel are defined in:
 
 ```text
 1. Receive NACK on port 9300
-2. Rate limit check (IP)
-   → If exceeded: silent drop, increment bre_rate_limit_drops_total
-3. Cache lookup by LookupType + LookupSeq (dual-index)
-   → If found in cache:
-     → Re-multicast to FF05::<shard>:9001 (if -retransmit-multicast)
-     → Unicast to NACK source (if -retransmit-unicast)
-     → Send 16-byte ACK unicast to NACK source (unless -suppress-ack)
-   → If not found:
-     → Send 16-byte MISS unicast to NACK source (unless -suppress-miss)
-     → Increment bre_cache_misses_total
+2. Rate limit tier 1 (IP): per-source-IP token bucket
+   → If exceeded: silent drop, increment bre_rate_limit_drops_total{level="ip"}
+3. Rate limit tier 2 (chain): per-(srcIP,ChainID) sliding window; ChainID=0 bypasses
+   → If exceeded: silent drop, increment bre_rate_limit_drops_total{level="chain"}
+4. Rate limit tier 3 (sequence): per-LookupSeq sliding window
+   → If exceeded: silent drop, increment bre_rate_limit_drops_total{level="sequence"}
+5. Cache lookup by LookupType + LookupSeq (dual-index)
+   → If not found: send 16-byte MISS; increment bre_cache_misses_total
+   → If found:
+     6. Rate limit tier 4 (group): per-(srcIP,groupIdx) token bucket, post-lookup
+        → If exceeded: skip retransmit; increment bre_rate_limit_drops_total{level="group"}
+        → Send 16-byte ACK regardless (listener must not escalate)
+     7. Re-multicast to FF05::<shard>:9001 (if -retransmit-multicast, not throttled)
+     8. Unicast to NACK source (if -retransmit-unicast, not throttled)
+     9. Send 16-byte ACK unicast to NACK source (unless -suppress-ack)
 ```
 
 ### Reliability Characteristics

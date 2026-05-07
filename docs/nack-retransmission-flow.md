@@ -202,6 +202,7 @@ No protocol changes required. Network team extends multicast fabric via MP-BGP.
 | Mechanism               | Layer          | Effect                                                          |
 | ----------------------- | -------------- | --------------------------------------------------------------- |
 | Cache TTL (60 s)        | Retry endpoint | Frames expire naturally; bounds retransmit window               |
+| Multi-tier rate limiting | Retry endpoint | Per-IP, per-chain, per-sequence (pre-lookup, silent drop); per-group (post-lookup, ACK preserved) |
 | `Tracker.Fill()`        | Listener       | Multicast repair cancels pending NACKs for all listeners        |
 | Jitter hold-off         | Listener       | Randomised delay before first NACK suppresses duplicates        |
 | Exponential backoff     | Listener       | Reduces NACK rate on persistent gaps                            |
