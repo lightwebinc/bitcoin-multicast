@@ -300,7 +300,7 @@ Bits [23:0]      index  Group index (up to 24 bits = 16,777,216 groups)
 
 | Index    | Purpose                    | Scope | Compressed Address |
 | -------- | -------------------------- | ----- | ------------------ |
-| 0xFFFFFC | Subtree announce (BRC-127) | FF05  | FF05::FF:FFFC      |
+| 0xFFFFFC | Subtree announce           | FF0E  | FF0E::FF:FFFC      |
 | 0xFFFFFD | Beacon (site)              | FF05  | FF05::FF:FFFD      |
 | 0xFFFFFD | Beacon (global)            | FF0E  | FF0E::FF:FFFD      |
 | 0xFFFFFE | Control channel            | FF0E  | FF0E::FF:FFFE      |
