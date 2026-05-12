@@ -53,9 +53,9 @@ The multicast pipeline consists of three tiers:
 │                       Multicast Fabric (Site-Scoped)                        │
 │                    FF05::/16, UDP Port 9001                                 │
 │         ┌──────────────┬──────────────┬──────────────┐                      │
-│         │ Direct Subs  │   Listeners  │  Retry Nodes │                      │
-│         │ (Miners,     │  (Filtered   │  (Cache &    │                      │
-│         │  Exchanges)  │   Forward)   │   Retransmit)│                      │
+│         │ Direct Subs  │ Listeners    │ Retry Nodes  │                      │
+│         │ (Miners,     │ (Filtered    │ (Cache &     │                      │
+│         │  Exchanges)  │  Forward)    │  Retransmit) │                      │
 │         └──────────────┴──────────────┴──────────────┘                      │
 └───────────────────────────────┬─────────────────────────────────────────────┘
                                 │
@@ -593,7 +593,7 @@ Group address assignments for beacons and the control channel are defined in:
 
 ### Subtree Model
 
-A _subtree_ is an ordered set of related transactions sharing a common batch context. The 32-byte `SubtreeID` field allows downstream subscribers to associate frames with a named batch. In Teranode, this is currently used to batch transactions for processing and to link ordered sets of validated transactions from block templates. This may be extended to support transaction specialization, and some sort of dynamic announcement and hashing mechanism may be required later.
+A _subtree_ is an ordered set of related transactions sharing a common batch context. The 32-byte `SubtreeID` field allows downstream subscribers to associate frames with a named batch. In Teranode, this is currently used to batch transactions for processing and to link ordered sets of validated transactions from block templates. This may be extended to support transaction specialization, and some sort of dynamic announcement and hashing mechanism may be required later. A rudimentary implementation has been put together in the proposed [BRC-127: Subtree Group Accouncement Protocol](https://github.com/lightwebinc/bitcoin-multicast/blob/main/docs/brc-127-subtree-announce.md).
 
 **Use Cases:**
 
@@ -957,5 +957,5 @@ Covers: full pipeline diagram, gap detection & dispatch, tier model, preference 
 
 ---
 
-_Document Version: 1.4_  
-_Last Updated: 2026-05-11_
+_Document Version: 1.5_  
+_Last Updated: 2026-05-12_
