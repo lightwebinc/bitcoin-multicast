@@ -38,14 +38,15 @@ groupIndex = binary.BigEndian.Uint32(txid[0:4]) >> (32 - shardBits)
 
 Control-plane groups occupy the top of the 24-bit index space, ensuring orthogonality with all practical shard configurations (`shardBits ≤ 23`).
 
-| Index      | Purpose              | Scope  | Full address (no middle bytes)            | Compressed      |
-| ---------- | -------------------- | ------ | ----------------------------------------- | --------------- |
-| `0xFFFFFC` | Subtree announce     | `FF0E` | `FF0E:0000:0000:0000:0000:0000:00FF:FFFC` | `FF0E::FF:FFFC` |
-| `0xFFFFFD` | Beacon (site)        | `FF05` | `FF05:0000:0000:0000:0000:0000:00FF:FFFD` | `FF05::FF:FFFD` |
-| `0xFFFFFD` | Beacon (org)         | `FF08` | `FF08:0000:0000:0000:0000:0000:00FF:FFFD` | `FF08::FF:FFFD` |
-| `0xFFFFFD` | Beacon (global)      | `FF0E` | `FF0E:0000:0000:0000:0000:0000:00FF:FFFD` | `FF0E::FF:FFFD` |
-| `0xFFFFFE` | Control channel      | `FF0E` | `FF0E:0000:0000:0000:0000:0000:00FF:FFFE` | `FF0E::FF:FFFE` |
-| `0xFFFFFF` | _(reserved)_         | —      | reserved                                  | do not use      |
+| Index      | Purpose                   | Scope  | Full address (no middle bytes)            | Compressed      |
+| ---------- | ------------------------- | ------ | ----------------------------------------- | --------------- |
+| `0xFFFFFC` | Subtree announce (site)   | `FF05` | `FF05:0000:0000:0000:0000:0000:00FF:FFFC` | `FF05::FF:FFFC` |
+| `0xFFFFFC` | Subtree announce (global) | `FF0E` | `FF0E:0000:0000:0000:0000:0000:00FF:FFFC` | `FF0E::FF:FFFC` |
+| `0xFFFFFD` | Beacon (site)             | `FF05` | `FF05:0000:0000:0000:0000:0000:00FF:FFFD` | `FF05::FF:FFFD` |
+| `0xFFFFFD` | Beacon (org)              | `FF08` | `FF08:0000:0000:0000:0000:0000:00FF:FFFD` | `FF08::FF:FFFD` |
+| `0xFFFFFD` | Beacon (global)           | `FF0E` | `FF0E:0000:0000:0000:0000:0000:00FF:FFFD` | `FF0E::FF:FFFD` |
+| `0xFFFFFE` | Control channel           | `FF0E` | `FF0E:0000:0000:0000:0000:0000:00FF:FFFE` | `FF0E::FF:FFFE` |
+| `0xFFFFFF` | _(reserved)_              | —      | reserved                                  | do not use      |
 
 When middle bytes are configured (via `-mc-base-addr`), the same 11 bytes are interleaved at positions 2–12, shifting byte 12 from `0x00` to the last middle byte. The control-plane group indices remain orthogonal to all shard indices regardless.
 

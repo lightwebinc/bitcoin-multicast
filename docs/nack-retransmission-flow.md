@@ -44,9 +44,9 @@ Listener receives:  Seq 1, 2, 3, [gap], 6, 7, ...
                     ▼
          ┌──────────────────────────┐
          │  Ephemeral UDP socket    │
-         │  conn = DialUDP(endpoint)│
-         │  Write NACK              │
-         │  Read response (300ms)   │
+         │  conn = ListenPacket     │
+         │  WriteTo NACK            │
+         │  ReadFrom response(300ms)│
          └──────────┬───────────────┘
                     │
           ┌─────────┼─────────┐
@@ -199,11 +199,11 @@ No protocol changes required. Network team extends multicast fabric via MP-BGP.
 
 ## 8. Flood Prevention
 
-| Mechanism               | Layer          | Effect                                                          |
-| ----------------------- | -------------- | --------------------------------------------------------------- |
-| Cache TTL (60 s)        | Retry endpoint | Frames expire naturally; bounds retransmit window               |
+| Mechanism                | Layer          | Effect                                                                                            |
+| ------------------------ | -------------- | ------------------------------------------------------------------------------------------------- |
+| Cache TTL (60 s)         | Retry endpoint | Frames expire naturally; bounds retransmit window                                                 |
 | Multi-tier rate limiting | Retry endpoint | Per-IP, per-chain, per-sequence (pre-lookup, silent drop); per-group (post-lookup, ACK preserved) |
-| `Tracker.Fill()`        | Listener       | Multicast repair cancels pending NACKs for all listeners        |
-| Jitter hold-off         | Listener       | Randomised delay before first NACK suppresses duplicates        |
-| Exponential backoff     | Listener       | Reduces NACK rate on persistent gaps                            |
-| `MaxRetries` + `GapTTL` | Listener       | Gap entries evicted after retry exhaustion or absolute deadline |
+| `Tracker.Fill()`         | Listener       | Multicast repair cancels pending NACKs for all listeners                                          |
+| Jitter hold-off          | Listener       | Randomised delay before first NACK suppresses duplicates                                          |
+| Exponential backoff      | Listener       | Reduces NACK rate on persistent gaps                                                              |
+| `MaxRetries` + `GapTTL`  | Listener       | Gap entries evicted after retry exhaustion or absolute deadline                                   |

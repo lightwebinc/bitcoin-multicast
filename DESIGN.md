@@ -12,21 +12,35 @@ This document provides a comprehensive design overview of the entire multicast e
 
 ## Table of Contents
 
-1. [High-Level Architecture](#high-level-architecture)
-2. [Repository Overview](#repository-overview)
-3. [Network Topology](#network-topology)
-4. [Data Flow](#data-flow)
-5. [Sharding Mechanism](#sharding-mechanism)
-6. [Frame Format](#frame-format)
-7. [Component Deep Dives](#component-deep-dives)
-8. [Retransmission and Reliability](#retransmission-and-reliability)
-9. [Subtree Filtering](#subtree-filtering)
-10. [Group Announcement Protocol (BRC-127)](#group-announcement-protocol-brc-127)
-11. [Testing and Validation](#testing-and-validation)
-12. [Deployment Considerations](#deployment-considerations)
-13. [Endpoint Discovery (BRC-126)](#endpoint-discovery-brc-126)
-14. [BRC-128: Extended Format Frames](#brc-128-extended-format-frames)
-15. [NACK Retransmission Flow](#nack-retransmission-flow)
+- [Terminology](#terminology)
+- [High-Level Architecture](#high-level-architecture)
+- [Repository Overview](#repository-overview)
+- [Network Topology](#network-topology)
+- [Data Flow](#data-flow)
+- [Sharding Mechanism](#sharding-mechanism)
+- [Frame Format](#frame-format)
+- [Component Deep Dives](#component-deep-dives)
+- [Retransmission and Reliability](#retransmission-and-reliability)
+- [Subtree Filtering](#subtree-filtering)
+- [Group Announcement Protocol (BRC-127)](#group-announcement-protocol-brc-127)
+- [Testing and Validation](#testing-and-validation)
+- [Deployment Considerations](#deployment-considerations)
+
+---
+
+## Terminology
+
+| Term | Definition |
+| ---- | ---------- |
+| **Shard** | A deterministic partition of the transaction space. Each shard maps to one IPv6 multicast group; group membership is derived from the TxID. |
+| **Subtree** | An ordered set of related transactions sharing a common 32-byte batch identifier (`SubtreeID`). Used for transaction specialization and block template assembly. |
+| **Gap** | A detected break in the PrevSeq/CurSeq hash chain, indicating one or more missing frames. |
+| **Chain** | The per-(sender IP, multicast group) sequence of frames linked by PrevSeq/CurSeq hash values. |
+| **NACK** | Negative acknowledgement — a 24-byte datagram requesting retransmission of a missing frame. |
+| **ACK** | Positive acknowledgement — a 16-byte response confirming a retransmit was dispatched. |
+| **MISS** | Cache-miss response — a 16-byte response indicating the requested frame is not cached; triggers immediate escalation. |
+| **ADVERT** | A 56-byte beacon datagram advertising a retry endpoint's address, tier, and preference. |
+| **Fabric** | The IPv6 multicast network interconnecting proxies, listeners, and retry endpoints. |
 
 ---
 
@@ -105,9 +119,10 @@ The project is organized into multiple repositories, each with a specific respon
 
 ### Testing and Tools
 
-| Repository                                                                        | Purpose                                       |
-| --------------------------------------------------------------------------------- | --------------------------------------------- |
-| [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) | Traffic generator for load/functional testing |
+| Repository                                                                        | Purpose                                                    |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [bitcoin-subtx-generator](https://github.com/lightwebinc/bitcoin-subtx-generator) | Traffic generator for load/functional testing              |
+| [bitcoin-multicast-test](https://github.com/lightwebinc/bitcoin-multicast-test)   | Integration test harness; scenario suite, lab setup, deploy |
 
 ### Meta Repository
 
@@ -218,7 +233,7 @@ bitcoin-shard-listener detects gap:
                                     ▼
 NACK Dispatch (UDP to retry-endpoint:9300)
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ 24-byte NACK datagram: (Magic, LookupType, LookupSeq)                   │
+│ 24-byte BRC-126 NACK datagram (see BRC-126 wire format)                  │
 │ Endpoints tried by (Tier ASC, Preference DESC); MISS triggers escalation│
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -298,13 +313,14 @@ Bits [23:0]      index  Group index (up to 24 bits = 16,777,216 groups)
 
 **Control-Plane Reserved Indices (BRC-TBD-addressing):**
 
-| Index    | Purpose                    | Scope | Compressed Address |
-| -------- | -------------------------- | ----- | ------------------ |
-| 0xFFFFFC | Subtree announce           | FF0E  | FF0E::FF:FFFC      |
-| 0xFFFFFD | Beacon (site)              | FF05  | FF05::FF:FFFD      |
-| 0xFFFFFD | Beacon (global)            | FF0E  | FF0E::FF:FFFD      |
-| 0xFFFFFE | Control channel            | FF0E  | FF0E::FF:FFFE      |
-| 0xFFFFFF | _(reserved)_               | —     | do not use         |
+| Index    | Purpose                      | Scope | Compressed Address |
+| -------- | ---------------------------- | ----- | ------------------ |
+| 0xFFFFFC | Subtree announce (site)      | FF05  | FF05::FF:FFFC      |
+| 0xFFFFFC | Subtree announce (global)    | FF0E  | FF0E::FF:FFFC      |
+| 0xFFFFFD | Beacon (site)                | FF05  | FF05::FF:FFFD      |
+| 0xFFFFFD | Beacon (global)              | FF0E  | FF0E::FF:FFFD      |
+| 0xFFFFFE | Control channel              | FF0E  | FF0E::FF:FFFE      |
+| 0xFFFFFF | _(reserved)_                 | —     | do not use         |
 
 See [BRC-TBD-addressing Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md) for full details.
 
@@ -356,20 +372,9 @@ TCP Listener (1 goroutine)
   └──────────────┘
 ```
 
-**Hot Path (UDP and TCP data frames):**
+**Hot path:** Decode frame → stamp PrevSeq/CurSeq in-place (XXH64, BRC-124 only) → derive multicast group from TxID → `WriteTo` verbatim to all egress interfaces. TCP connections carry the same frame stream plus BRC-127 SubtreeAnnounce control datagrams (forwarded verbatim to the announce multicast group).
 
-1. `frame.Decode(raw)` → extract TxID
-2. If CurSeq (`raw[48:56]`) is non-zero: sender pre-stamped; forward verbatim. Else stamp `raw[40:48]` (PrevSeq) and `raw[48:56]` (CurSeq) = XXH64 hash chain per `(senderIPv6, groupIdx)`
-3. `shard.Engine.GroupIndex(txid)` → derive group
-4. `WriteTo(raw)` → write to all egress interfaces
-
-**TCP Control Frame Path (BRC-127):**
-
-- Detect `MsgTypeSubtreeAnnounce` (0x30) at `buf[6]` in the TCP stream
-- Read 64-byte fixed datagram; call `ForwardControl(targets, buf, CtrlGroupSubtreeAnnounce, egressPort)`
-- Multicasts verbatim to `FF05::FF:FFFC`; no sequence stamping or frame decoding
-
-**→ [bitcoin-shard-proxy docs](https://github.com/lightwebinc/bitcoin-shard-proxy/blob/main/docs/architecture.md)** — architecture, configuration reference, metrics
+**→ [bitcoin-shard-proxy Architecture](https://github.com/lightwebinc/bitcoin-shard-proxy/blob/main/docs/architecture.md)** — hot-path detail, configuration reference, metrics
 
 ---
 
@@ -421,35 +426,13 @@ Gap Tracker Sweeper (100ms interval)
   └──────────────────┘
 ```
 
-**Important:** Linux delivers multicast to ALL SO_REUSEPORT sockets (no load balancing). For multicast deployments, `NUM_WORKERS` must be set to 1. Multiple workers are only useful for unicast ingress (E2E test suite).
+**Important:** Linux delivers multicast to ALL SO_REUSEPORT sockets (no load balancing). For multicast deployments, `NUM_WORKERS` must be set to 1.
 
-**Filter Behavior:**
+**Filtering:** Dual-level — shard index (MLD group join + userspace filter) and subtree ID (static include/exclude lists, plus dynamic BRC-127 group membership via `subtreegroup.Registry`). See [Subtree Filtering](#subtree-filtering) and [BRC-127](#group-announcement-protocol-brc-127) below.
 
-| Config                      | Behavior                                                                   |
-| --------------------------- | -------------------------------------------------------------------------- |
-| `shard-include` empty       | All shard indices accepted                                                 |
-| `shard-include` non-empty   | Only listed indices accepted                                               |
-| `subtree-include` empty     | All SubtreeIDs accepted                                                    |
-| `subtree-include` non-empty | Only listed IDs accepted                                                   |
-| `subtree-exclude`           | Listed IDs dropped (overrides include)                                     |
-| `-subtree-groups` non-empty | SubtreeIDs in any live announced GroupID accepted (OR with static include) |
+**Gap tracking:** Per-group PrevSeq/CurSeq hash-chain verification. Chain breaks register gap entries; a background sweeper dispatches NACKs with exponential backoff. Gaps are auto-closed when the missing frame arrives via multicast or explicit NACK ACK.
 
-**Dynamic Subtree Group Filtering (BRC-127):**
-
-When `-subtree-groups` is configured, the listener instantiates a `subtreegroup.Registry` and wires it into the filter as `groupReg`. On each frame, `filter.Allow` calls `groupReg.Contains(SubtreeID)` as an additional acceptance path alongside the static `-subtree-include` list. Entries expire when not refreshed before their TTL (default: 900 s); configure with `-subtree-group-default-ttl`.
-
-Source filtering for announcements: `-sender-include` / `-sender-exclude` restrict which IPv6 sources are accepted. Both support CIDR notation.
-
-**Gap Tracking:**
-
-- State: per-group `lastCurSeq` and `pending` map
-- When `PrevSeq ≠ lastCurSeq`: register gap entry keyed on incoming `PrevSeq`
-- When incoming `CurSeq` matches a pending key: auto-close gap (multicast fill)
-- `Tracker.Fill(groupIdx, curSeq)` closes gap from explicit NACK ACK
-- Sweeper evicts expired gaps as `bsl_gaps_unrecovered_total`
-- NACK dispatch with exponential backoff (capped at `nack-backoff-max`)
-
-**→ [bitcoin-shard-listener docs](https://github.com/lightwebinc/bitcoin-shard-listener/blob/main/docs/architecture.md)** — architecture, configuration reference, metrics
+**→ [bitcoin-shard-listener Architecture](https://github.com/lightwebinc/bitcoin-shard-listener/blob/main/docs/architecture.md)** — filter behavior table, gap tracker internals, configuration reference, metrics
 
 ---
 
@@ -483,9 +466,9 @@ Retransmit Egress
   └──────────────────┘
 ```
 
-**Cache:** freecache (60 s TTL, GC-free). Dual-index: primary key `0x01‖CurSeq → raw frame`, secondary key `0x00‖PrevSeq → CurSeq`. Supports both forward (by PrevSeq) and backward (by CurSeq) NACK lookups.
+**Cache:** Dual-index by CurSeq (primary) and PrevSeq (secondary pointer), supporting both forward and backward NACK lookups. Default backend: in-process freecache (60 s TTL, GC-free). Optional: Redis for cross-instance shared cache.
 
-**→ [bitcoin-retry-endpoint Architecture](https://github.com/lightwebinc/bitcoin-retry-endpoint/blob/main/docs/architecture.md)** — architecture, configuration reference, metrics
+**→ [bitcoin-retry-endpoint Architecture](https://github.com/lightwebinc/bitcoin-retry-endpoint/blob/main/docs/architecture.md)** — cache encoding, rate-limit configuration, configuration reference, metrics
 
 ---
 
@@ -543,26 +526,17 @@ Group address assignments for beacons and the control channel are defined in:
 
 **→ [BRC-TBD-addressing Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md)**
 
+Inter-AS extension via MP-BGP requires no protocol changes — network teams extend the multicast fabric; endpoints and listeners operate identically.
+
+The end-to-end NACK retransmission flow — from gap detection through escalation to repair delivery — is documented with ASCII diagrams in:
+
+**→ [NACK Retransmission Flow](docs/nack-retransmission-flow.md)**
+
 ### Retry Endpoint Processing
 
-```text
-1. Receive NACK on port 9300
-2. Rate limit tier 1 (IP): per-source-IP token bucket
-   → If exceeded: silent drop, increment bre_rate_limit_drops_total{level="ip"}
-3. Rate limit tier 2 (chain): per-(srcIP,ChainID) sliding window; ChainID=0 bypasses
-   → If exceeded: silent drop, increment bre_rate_limit_drops_total{level="chain"}
-4. Rate limit tier 3 (sequence): per-LookupSeq sliding window
-   → If exceeded: silent drop, increment bre_rate_limit_drops_total{level="sequence"}
-5. Cache lookup by LookupType + LookupSeq (dual-index)
-   → If not found: send 16-byte MISS; increment bre_cache_misses_total
-   → If found:
-     6. Rate limit tier 4 (group): per-(srcIP,groupIdx) token bucket, post-lookup
-        → If exceeded: skip retransmit; increment bre_rate_limit_drops_total{level="group"}
-        → Send 16-byte ACK regardless (listener must not escalate)
-     7. Re-multicast to FF05::<shard>:9001 (if -retransmit-multicast, not throttled)
-     8. Unicast to NACK source (if -retransmit-unicast, not throttled)
-     9. Send 16-byte ACK unicast to NACK source (unless -suppress-ack)
-```
+The retry endpoint applies four-tier rate limiting (per-IP, per-chain, per-sequence pre-lookup; per-group post-lookup), performs a dual-index cache lookup, and retransmits via multicast and/or unicast on a hit. On a miss, a 16-byte MISS response triggers immediate listener escalation. The group-tier limiter skips the retransmit but still sends ACK so the listener does not escalate unnecessarily.
+
+See **[BRC-126 (Retransmission Protocol)](docs/brc-126-retransmission-protocol.md)** and **[bitcoin-retry-endpoint Architecture](https://github.com/lightwebinc/bitcoin-retry-endpoint/blob/main/docs/architecture.md)** for the full processing pipeline and rate-limit configuration.
 
 ### Reliability Characteristics
 
@@ -593,7 +567,7 @@ Group address assignments for beacons and the control channel are defined in:
 
 ### Subtree Model
 
-A _subtree_ is an ordered set of related transactions sharing a common batch context. The 32-byte `SubtreeID` field allows downstream subscribers to associate frames with a named batch. In Teranode, this is currently used to batch transactions for processing and to link ordered sets of validated transactions from block templates. This may be extended to support transaction specialization, and some sort of dynamic announcement and hashing mechanism may be required later. A rudimentary implementation has been put together in the proposed [BRC-127: Subtree Group Accouncement Protocol](https://github.com/lightwebinc/bitcoin-multicast/blob/main/docs/brc-127-subtree-announce.md).
+A _subtree_ is an ordered set of related transactions sharing a common batch context. The 32-byte `SubtreeID` field allows downstream subscribers to associate frames with a named batch. In Teranode, this is currently used to batch transactions for processing and to link ordered sets of validated transactions from block templates. This may be extended to support transaction specialization, and some sort of dynamic announcement and hashing mechanism may be required later. A rudimentary implementation has been put together in the proposed [BRC-127: Subtree Group Announcement Protocol](https://github.com/lightwebinc/bitcoin-multicast/blob/main/docs/brc-127-subtree-announce.md).
 
 **Use Cases:**
 
@@ -629,59 +603,15 @@ subtree-exclude = "abc123...,def456..."  (hex, 32-byte each)
 - V1 frames have zero SubtreeID
 - Only pass subtree filter if zero is explicitly listed in `subtree-include`
 
-### Deterministic Subtree Selection (Testing)
-
-The `bitcoin-subtx-generator` tool uses deterministic subtree selection for reproducible tests:
-
-```
-SubtreeID = pool[uint64(TxID[:8]) % N]
-```
-
-With N=8 subtrees and a fixed seed, the same txid always maps to the same subtree. This allows listeners filtering on a single subtree to see a predictable traffic fraction (~1/N).
-
 ---
 
 ## Group Announcement Protocol (BRC-127)
 
-BRC-127 defines the dynamic subtree group announcement protocol. Producers advertise which SubtreeIDs belong to which logical group; listeners subscribe to named groups and automatically accept frames from those subtrees without static configuration.
+BRC-127 defines the dynamic subtree group announcement protocol. Producers advertise which SubtreeIDs belong to which logical group by sending 64-byte `SubtreeAnnounce` datagrams (`MsgType 0x30`) to the proxy TCP ingress. The proxy forwards these verbatim to the control-plane multicast group (`CtrlGroupSubtreeAnnounce = 0xFFFFFC`). Listeners join this group and populate a `subtreegroup.Registry`, automatically accepting frames from announced subtrees without static configuration.
 
-**→ [BRC-127 Subtree Group Announcement](docs/brc-127-subtree-announce.md)**
+Announcements must be re-sent before their TTL expires (recommended: interval 10–30 s; TTL ≥ 3× interval). If announcements cease, entries expire and frames are dropped.
 
-### Wire Format
-
-A 64-byte `SubtreeAnnounce` datagram (`MsgType 0x30`) maps one SubtreeID to one GroupID with a TTL:
-
-```text
-Offset  Size  Field
-------  ----  -----
-     0     4  Magic (0xE3E1F3E8)
-     4     2  ProtoVer (0x02BF)
-     6     1  MsgType = 0x30
-     7     1  Flags (reserved)
-     8    32  SubtreeID  — 32-byte SHA-256 subtree root hash
-    40    16  GroupID    — 128-bit logical group identifier
-    56     4  Epoch      — Unix timestamp of announcement
-    60     2  TTL        — Validity in seconds; 0 = listener default (900 s)
-    62     2  Reserved
-```
-
-### Distribution
-
-Producers send SubtreeAnnounce datagrams to the proxy TCP ingress. The proxy's TCP path detects `MsgType 0x30` and calls `ForwardControl`, multicasting verbatim to `FF05::FF:FFFC` (`CtrlGroupSubtreeAnnounce = 0xFFFFFC`). Listeners join this group and populate `subtreegroup.Registry`.
-
-### Listener Configuration
-
-| Flag / Env var                                             | Default | Description                                       |
-| ---------------------------------------------------------- | ------- | ------------------------------------------------- |
-| `-subtree-groups` / `SUBTREE_GROUPS`                       | `""`    | Comma-separated 32-char hex GroupIDs to subscribe |
-| `-subtree-group-default-ttl` / `SUBTREE_GROUP_DEFAULT_TTL` | `900s`  | Fallback TTL when announcement TTL = 0            |
-| `-announce-scope` / `ANNOUNCE_SCOPE`                       | `site`  | Scope(s) for announcement group joins             |
-| `-sender-include` / `SENDER_INCLUDE`                       | `""`    | IPv6 CIDRs of trusted announcement senders        |
-| `-sender-exclude` / `SENDER_EXCLUDE`                       | `""`    | IPv6 CIDRs to reject                              |
-
-### Refresh and Expiry
-
-Announcements must be re-sent before their TTL expires. Recommended: interval 10–30 s; TTL ≥ 3× interval. If announcements cease, entries expire and frames are dropped with `bsl_frames_dropped_total{reason="subtree_include_miss"}`.
+**→ [BRC-127 Subtree Group Announcement](docs/brc-127-subtree-announce.md)** — wire format, listener configuration flags, distribution path, refresh/expiry rules
 
 ---
 
@@ -715,6 +645,27 @@ make test-e2e
 ```
 
 **Documentation:** [bitcoin-shard-listener README](https://github.com/lightwebinc/bitcoin-shard-listener)
+
+### Integration Test Scenarios (bitcoin-multicast-test)
+
+**Purpose:** Full-stack integration testing across all components in an LXD-based lab environment.
+
+The [bitcoin-multicast-test](https://github.com/lightwebinc/bitcoin-multicast-test) repository provides:
+
+- **Lab setup scripts** — automated LXD VM provisioning (source, proxy, listeners, retry endpoints, metrics)
+- **Ansible deploy** — single-command deployment of all services via `run-deploy.sh`
+- **Scenario suite** — numbered test scenarios covering functional validation, shard/subtree filtering, multicast egress bridging, NACK retransmission, rate limiting, beacon discovery, MISS escalation, and BRC-127 group announcements
+- **`run-all.sh`** — sequential execution of all scenarios with pass/fail summary
+
+**Getting Started:**
+
+```bash
+cd bitcoin-multicast-test
+bash lab/01-network.sh      # Create LXD networks and VM profiles
+bash lab/03-launch.sh       # Launch VMs
+bash ansible/run-deploy.sh  # Deploy all services
+bash scenarios/run-all.sh   # Run full scenario suite
+```
 
 ---
 
@@ -835,9 +786,13 @@ All services handle SIGINT/SIGTERM identically: set draining flag (`/readyz` →
 
 **Protocol:**
 
-- [Wire Protocol Specification](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md) - Complete v1/BRC-124 frame format
-- [BRC-127 Subtree Group Announcement](docs/brc-127-subtree-announce.md) - SubtreeAnnounce wire format, proxy forwarding, listener integration
-- [BRC-128 Extended Format](docs/brc-128-ef-frame-format.md) - EF payload format, detection, infrastructure impact
+- [Wire Protocol Specification](https://github.com/lightwebinc/bitcoin-shard-common/blob/main/docs/protocol.md) — Complete v1/BRC-124 frame format
+- [BRC-124 Frame Format](docs/brc-124-frame-format.md) — 92-byte header, PrevSeq/CurSeq hash chain, backward compatibility
+- [BRC-126 Retransmission Protocol](docs/brc-126-retransmission-protocol.md) — NACK/ACK/MISS wire formats, ADVERT beacon, tier/preference model
+- [BRC-127 Subtree Group Announcement](docs/brc-127-subtree-announce.md) — SubtreeAnnounce wire format, proxy forwarding, listener integration
+- [BRC-128 Extended Format](docs/brc-128-ef-frame-format.md) — EF payload format, detection, infrastructure impact
+- [BRC-TBD Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md) — IPv6 address scheme, control-plane indices, beacon groups
+- [NACK Retransmission Flow](docs/nack-retransmission-flow.md) — End-to-end pipeline diagrams, escalation state machine, flood prevention
 
 **Services:**
 
@@ -913,49 +868,5 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 
 ---
 
-## Endpoint Discovery (BRC-126)
-
-Retry endpoint discoverability and hierarchical retransmission are defined across two BRCs:
-
-- **[BRC-126 — Retransmission Protocol](docs/brc-126-retransmission-protocol.md):** ADVERT beacon format, NACK/ACK/MISS wire formats, Tier/Preference model, escalation state machine, configurable retransmit modes, flood prevention.
-- **[BRC-TBD-addressing — Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md):** Control-plane group index reservations, beacon group addresses, site vs global scope, block template group reservation.
-
-### Summary
-
-- Retry endpoints send 56-byte ADVERT beacons every 60 s (configurable) to site (`FF05::FF:FFFD`) and/or global (`FF0E::FF:FFFD`) beacon groups.
-- Listeners join beacon groups at startup and maintain a dynamic `discovery.Registry` sorted by `(Tier ASC, Preference DESC)`.
-- Static `-retry-endpoints` seeds the registry at `Tier=0xFF, Preference=0` (lowest priority).
-- On NACK, the listener selects the highest-priority endpoint, sends a 24-byte NACK, and waits ≤300 ms for a 16-byte ACK or MISS response.
-- ACK cancels the gap; MISS advances to the next endpoint immediately; timeout triggers exponential backoff.
-- Inter-AS extension via MP-BGP requires no protocol changes.
-
----
-
-## BRC-128: Extended Format Frames
-
-BRC-128 carries BRC-30 Extended Format (EF) transaction payloads inside the standard 92-byte BRC-124 header. Frame Version remains `0x02`.
-
-**→ [BRC-128 Extended Format](docs/brc-128-ef-frame-format.md)**
-
-### Summary
-
-- **Header:** Identical to BRC-124 (92 bytes). Frame Version `0x02` unchanged.
-- **Payload:** BRC-30 Extended Format. Self-identifying via the 6-byte marker `0x00 0x00 0x00 0x00 0x00 0xEF` at payload bytes 4–9.
-- **Detection:** Inspect payload bytes 4–9; the EF marker present → BRC-30 EF (BRC-128); absent → BRC-12 raw transaction (BRC-124).
-- **Infrastructure impact:** None. Proxy, listener, and retry endpoint are payload-agnostic. BRC-124 and BRC-128 frames coexist on the same multicast groups.
-- **Downstream consumers:** Must inspect the payload marker to select the correct parser (BRC-12 or BRC-30).
-
----
-
-## NACK Retransmission Flow
-
-The end-to-end NACK retransmission flow — from gap detection through escalation to repair delivery — is documented with ASCII diagrams in:
-
-**→ [NACK Retransmission Flow](docs/nack-retransmission-flow.md)**
-
-Covers: full pipeline diagram, gap detection & dispatch, tier model, preference within a tier, escalation state machine, beacon discovery, inter-AS extension, and flood prevention.
-
----
-
-_Document Version: 1.5_  
+_Document Version: 1.6_  
 _Last Updated: 2026-05-12_
