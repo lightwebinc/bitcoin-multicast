@@ -334,7 +334,7 @@ on-wire default is `0x000B` for IANA conformance.
 | 0xFFFE | Control channel              | FF0E  | FF0E::B:FFFE      |
 | 0xFFFF | _(reserved)_                 | —     | do not use         |
 
-See [BRC-TBD-addressing Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md) for full details.
+See [BRC-129 Multicast Group Address Assignments](docs/brc-129-multicast-addressing.md) for full details.
 
 ## Frame Format
 
@@ -536,7 +536,7 @@ Retry endpoints advertise via periodic ADVERT beacons (see [BRC-126](docs/brc-12
 
 Group address assignments for beacons and the control channel are defined in:
 
-**→ [BRC-TBD-addressing Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md)**
+**→ [BRC-129 Multicast Group Address Assignments](docs/brc-129-multicast-addressing.md)**
 
 Inter-AS extension via MP-BGP requires no protocol changes — network teams extend the multicast fabric; endpoints and listeners operate identically.
 
@@ -803,7 +803,7 @@ All services handle SIGINT/SIGTERM identically: set draining flag (`/readyz` →
 - [BRC-126 Retransmission Protocol](docs/brc-126-retransmission-protocol.md) — NACK/ACK/MISS wire formats, ADVERT beacon, tier/preference model
 - [BRC-127 Subtree Group Announcement](docs/brc-127-subtree-announce.md) — SubtreeAnnounce wire format, proxy forwarding, listener integration
 - [BRC-128 Extended Format](docs/brc-128-ef-frame-format.md) — EF payload format, detection, infrastructure impact
-- [BRC-TBD Multicast Group Address Assignments](docs/brc-tbd-multicast-addressing.md) — IPv6 address scheme, control-plane indices, beacon groups
+- [BRC-129 Multicast Group Address Assignments](docs/brc-129-multicast-addressing.md) — IPv6 address scheme, control-plane indices, beacon groups
 - [NACK Retransmission Flow](docs/nack-retransmission-flow.md) — End-to-end pipeline diagrams, escalation state machine, flood prevention
 
 **Services:**
