@@ -24,6 +24,7 @@ This document provides a comprehensive design overview of the entire multicast e
 - [Subtree Filtering](#subtree-filtering)
 - [Fragmentation (BRC-130)](#fragmentation-brc-130)
 - [Group Announcement Protocol (BRC-127)](#group-announcement-protocol-brc-127)
+- [Block Announcement Protocol (BRC-131)](#block-announcement-protocol-brc-131)
 - [Testing and Validation](#testing-and-validation)
 - [Deployment Considerations](#deployment-considerations)
 
@@ -666,6 +667,23 @@ Announcements must be re-sent before their TTL expires (recommended: interval 10
 
 ---
 
+## Block Announcement Protocol (BRC-131)
+
+BRC-131 defines a dedicated frame version (`FrameVer 0x04`) for distributing block-level metadata to all fabric subscribers. Two message types are defined:
+
+- **BlockAnnounce (`MsgType 0x01`)** — carries the 80-byte block header, the CoinbaseTxID, and an ordered list of subtree root hashes included in the block. Subscribers use this to update block templates and validate received transactions against the new chain tip.
+- **CoinbaseTx (`MsgType 0x02`)** — carries the raw coinbase transaction bytes. The ContentID in the frame header is the SHA256d of the coinbase transaction.
+
+Both types share the 92-byte BRC-124 header layout and are delivered on the **CtrlGroupControl** group (`FF0E::B:FFFE`), ensuring global reach independent of shard assignment. Every subscriber receives every block announcement — there is no shard or subtree filtering for block frames.
+
+Sequence tracking and NACK-based retransmission work identically to BRC-124: the proxy stamps `HashKey` and `SeqNum` in-place, listeners track the control flow for gaps, and retry endpoints cache and retransmit V4 frames back to the control group (not to a shard group — a critical routing distinction).
+
+For payloads exceeding the path MTU (uncommon for typical block announcements but relevant for large coinbase transactions), the proxy uses BRC-130 fragmentation with `OrigFrameVer=0x04` in the fragment header.
+
+**→ [BRC-131 Block Announcement Protocol](docs/brc-131-block-announcements.md)** — frame header layout, BlockAnnounce payload format, CoinbaseTx payload, gap tracking on the control flow, fragmentation rules, proxy/listener/retry-endpoint changes
+
+---
+
 ## Testing and Validation
 
 ### bitcoin-subtx-generator
@@ -705,7 +723,7 @@ The [bitcoin-multicast-test](https://github.com/lightwebinc/bitcoin-multicast-te
 
 - **Lab setup scripts** — automated LXD VM provisioning (source, proxy, listeners, retry endpoints, metrics)
 - **Ansible deploy** — single-command deployment of all services via `run-deploy.sh`
-- **Scenario suite** — numbered test scenarios covering functional validation, shard/subtree filtering, multicast egress bridging, NACK retransmission, rate limiting, beacon discovery, MISS escalation, and BRC-127 group announcements
+- **Scenario suite** — numbered test scenarios covering functional validation, shard/subtree filtering, multicast egress bridging, NACK retransmission, rate limiting, beacon discovery, MISS escalation, BRC-127 group announcements, and BRC-131 block announcement delivery and retransmission
 - **`run-all.sh`** — sequential execution of all scenarios with pass/fail summary
 
 **Getting Started:**
@@ -844,6 +862,7 @@ All services handle SIGINT/SIGTERM identically: set draining flag (`/readyz` →
 - [BRC-128 Extended Format](docs/brc-128-ef-frame-format.md) — EF payload format, detection, infrastructure impact
 - [BRC-129 Multicast Group Address Assignments](docs/brc-129-multicast-addressing.md) — IPv6 address scheme, control-plane indices, beacon groups
 - [BRC-130 Fragmentation](docs/brc-130-fragmentation.md) — fragment header layout, fragDataSize, per-fragment NACK, reassembly algorithm, metrics
+- [BRC-131 Block Announcement Protocol](docs/brc-131-block-announcements.md) — block frame header, BlockAnnounce + CoinbaseTx payloads, control-group routing, proxy/listener/retry-endpoint changes
 - [NACK Retransmission Flow](docs/nack-retransmission-flow.md) — End-to-end pipeline diagrams, escalation state machine, flood prevention
 
 **Services:**
@@ -918,8 +937,9 @@ The IPv6 multicast transaction broadcast architecture from which this software d
 | BRC-124 | 92 bytes    | Yes (HashKey/SeqNum) | Yes              |
 | BRC-128 | 92 bytes    | Yes (HashKey/SeqNum) | Yes (EF payload) |
 | BRC-130 | 104 bytes   | Yes (per-fragment)   | Yes (fragmented) |
+| BRC-131 | 92 bytes    | Yes (HashKey/SeqNum) | No (ctrl-plane)  |
 
 ---
 
-_Document Version: 1.9_  
-_Last Updated: 2026-05-17_
+_Document Version: 1.10_  
+_Last Updated: 2026-05-18_
