@@ -2,10 +2,6 @@
 
 BRC-128 defines BRC-30 Extended Format transaction payloads inside the standard BRC-124 frame. The 92-byte header is unchanged; Frame Version remains `0x02`.
 
-> **Status:** Current BRC for EF-payload multicast frames.
->
-> **Canonical BRC:** [bitcoin-sv/BRCs — transactions/0128.md](https://github.com/bitcoin-sv/BRCs/blob/master/transactions/0128.md)
-
 ---
 
 ## Frame Layout

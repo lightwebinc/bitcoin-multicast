@@ -2,8 +2,6 @@
 
 BRC-126 defines the NACK-based retransmission and endpoint discovery protocol for the BSV multicast pipeline. It specifies the ADVERT beacon message, the MISS/ACK response messages, tier/preference-based endpoint selection, and configurable retransmit modes.
 
-> **Status:** To be submitted as BRC-126 PR to github.com/bitcoin-sv/BRCs
-
 ---
 
 ## Overview

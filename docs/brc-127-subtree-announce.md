@@ -2,8 +2,6 @@
 
 BRC-127 defines the protocol for dynamically advertising SubtreeID–GroupID bindings over the multicast fabric. Producers send periodic `SubtreeAnnounce` datagrams to the proxy via TCP; the proxy forwards them to the `CtrlGroupSubtreeAnnounce` multicast group (`FF05::B:FFFC`). Listeners subscribe to this group and populate a dynamic registry used at the subtree filter layer.
 
-> **Status:** To be submitted as BRC-127 PR to github.com/bitcoin-sv/BRCs
-
 ---
 
 ## Purpose

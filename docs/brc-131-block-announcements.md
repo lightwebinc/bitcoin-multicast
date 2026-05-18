@@ -2,10 +2,6 @@
 
 BRC-131 defines a new frame version (0x04) for distributing block-level metadata over the multicast fabric. Block announcements and coinbase transactions are delivered to all subscribers via a dedicated control-plane multicast group, independently of the shard groups used for transaction distribution.
 
-> **Status:** Current BRC for block metadata distribution on the multicast fabric.
->
-> **Canonical BRC:** [lightwebinc/BRCs — transactions/0131.md](https://github.com/lightwebinc/BRCs/blob/master/transactions/0131.md)
-
 ---
 
 ## Purpose

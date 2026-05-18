@@ -2,10 +2,6 @@
 
 BRC-130 is a fragmentation extension to BRC-124. When a BSV transaction payload exceeds the path MTU, the proxy decomposes it into a sequence of fixed-size fragment datagrams. Listeners reassemble the fragments and verify the reconstructed payload against the TxID before forwarding.
 
-> **Status:** Current BRC for large-transaction fragmentation on the multicast fabric.
->
-> **Canonical BRC:** [lightwebinc/BRCs — transactions/0130.md](https://github.com/lightwebinc/BRCs/blob/master/transactions/0130.md)
-
 ---
 
 ## Fragment Header Format (104 bytes)
